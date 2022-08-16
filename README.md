@@ -24,6 +24,14 @@ game.playerControl(0.0,0)
 game.player.state
 // Change walk speed
 game.player.state.RUN = 1000
+game.player.state.TURN = 2
+
+// World
+await game.loadEnvironment()
+
+
+// Mods
+import("./mods/skybox/load.js").then(ns=>ns.default(game))
 ```
 
 
