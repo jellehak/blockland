@@ -158,6 +158,7 @@ export class PlayerLocal extends Player {
     this.state = {
       RUN: 500,
       WALK: 150,
+      TURN: 1
     };
 
     const player = this;
@@ -205,9 +206,9 @@ export class PlayerLocal extends Player {
     msgForm.onsubmit = function (e) {
       socket.emit("chat message", {
         id: game.chatSocketId,
-        message: m.getAttribute("value"),
+        message: m.value,
       });
-      m.setAttribute("value", "");
+      m.value = "";
       return false;
     };
 
@@ -321,7 +322,7 @@ export class PlayerLocal extends Player {
       }
     }
 
-    this.object.rotateY(this.motion.turn * dt);
+    this.object.rotateY(this.state.TURN * this.motion.turn * dt);
 
     this.updateSocket();
   }
