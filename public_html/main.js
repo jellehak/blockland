@@ -7,25 +7,46 @@ console.log("Feel free to interact with `game`");
 // MOD: Keyboard input
 {
   const keyboard = new Keyboard();
+  
+  const input = {
+    keyboard,
+    state: {
+        FORWARD: 0.8,
+        TURN: 0.4 
+    },
+    dispose() {}
+  }
   // Expose
-  window.keyboard = keyboard;
+  window.input = input
+
   function update() {
+    let forward = 0;
+    let turn = 0;
+
     // console.log(k.keysPressed);
     if (keyboard.keysPressed["w"]) {
-      game.playerControl(0.4, 0);
+      forward = input.state.FORWARD;
     }
     if (keyboard.keysPressed["s"]) {
-      game.playerControl(-0.1, 0);
+      forward = -input.state.FORWARD;
     }
     if (keyboard.keysPressed["a"]) {
-      game.playerControl(0.0, -0.1);
+      turn = -input.state.TURN;
     }
     if (keyboard.keysPressed["d"]) {
-      game.playerControl(0.0, 0.1);
+      turn = input.state.TURN;
     }
+
+    // if(keyboard.keysPressed) { console.log(keyboard.keysPressed) }
+    // console.log(keyboard.keysPressed)
+
+    game.playerControl(forward, turn);
+
     requestAnimationFrame(update);
   }
-  update();
+  setTimeout(() => {
+      update();
+  }, 3000)
 }
 
 // MOD: Stats

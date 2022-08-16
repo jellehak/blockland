@@ -331,7 +331,9 @@ export class SFX{
 }
 
 export class JoyStick{
-	constructor(options = {}){
+	constructor(options = {
+		onMove: () => {}
+	}){
 		const circle = document.createElement("div");
 		circle.style.cssText = "position:absolute; bottom:35px; width:80px; height:80px; background:rgba(126, 126, 126, 0.5); border:#444 solid medium; border-radius:50%; left:50%; transform:translateX(-50%);";
 		const thumb = document.createElement("div");

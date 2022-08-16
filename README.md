@@ -19,6 +19,11 @@ game.activeCamera = game.cameras.wide
 game.playerControl(0.4,0)
 // Stop
 game.playerControl(0.0,0)
+
+// # Local player
+game.player.state
+// Change walk speed
+game.player.state.RUN = 1000
 ```
 
 
