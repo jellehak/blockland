@@ -6,6 +6,20 @@ import { Player, PlayerLocal } from "./Player.js";
 // import "./libs/inflate.min.js"
 import "./libs/FBXLoader.js";
 
+class SceneProxy {
+  constructor(scene) {
+    this.stack = [];
+    this.scene = scene;
+  }
+  add(what) {
+    window.last = what;
+
+    this.stack.push(what);
+    this.scene.add(what);
+  }
+  undo() {}
+}
+
 const { FBXLoader } = THREE;
 /**
  * @example
@@ -51,11 +65,13 @@ export class Game {
     });
     this.mode = this.modes.NONE;
 
+    this.THREE = THREE;
     this.container;
     this.player = {};
     this.cameras;
     this.camera;
-    this.scene;
+    this.scene = new THREE.Scene();
+    this.sceneProxy = new SceneProxy(this.scene);
     this.renderer;
     this.animations = {};
     this.assetsPath = "assets/";
@@ -76,7 +92,6 @@ export class Game {
 
     const sfxExt = SFX.supportsAudioType("mp3") ? "mp3" : "ogg";
 
-    const game = this;
     this.anims = [
       "Walking",
       "Walking Backwards",
@@ -97,14 +112,14 @@ export class Game {
         `${this.assetsPath}images/pz.jpg`,
       ],
       oncomplete: function () {
-        game.init();
+        // game.init();
       },
     };
 
-    this.anims.forEach(function (anim) {
-      options.assets.push(`${game.assetsPath}fbx/anims/${anim}.fbx`);
+    this.anims.forEach((anim) => {
+      options.assets.push(`${this.assetsPath}fbx/anims/${anim}.fbx`);
     });
-    options.assets.push(`${game.assetsPath}fbx/town.fbx`);
+    options.assets.push(`${this.assetsPath}fbx/town.fbx`);
 
     this.mode = this.modes.PRELOAD;
 
@@ -115,30 +130,7 @@ export class Game {
     window.onError = function (error) {
       console.error(JSON.stringify(error));
     };
-  }
 
-  initSfx() {
-    this.sfx = {};
-    this.sfx.context = new (window.AudioContext || window.webkitAudioContext)();
-    this.sfx.gliss = new SFX({
-      context: this.sfx.context,
-      src: {
-        mp3: `${this.assetsPath}sfx/gliss.mp3`,
-        ogg: `${this.assetsPath}sfx/gliss.ogg`,
-      },
-      loop: false,
-      volume: 0.3,
-    });
-  }
-
-  set activeCamera(object) {
-    this.cameras.active = object;
-  }
-  get activeCamera() {
-    return this.cameras.active;
-  }
-
-  init() {
     this.mode = this.modes.INITIALISING;
 
     this.camera = new THREE.PerspectiveCamera(
@@ -148,7 +140,6 @@ export class Game {
       200000
     );
 
-    this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x00a0f0);
 
     const ambient = new THREE.AmbientLight(0xaaaaaa);
@@ -173,13 +164,60 @@ export class Game {
     this.sun = light;
     this.scene.add(light);
 
-    // model
-    const loader = new FBXLoader();
-    const game = this;
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.container.appendChild(this.renderer.domElement);
 
+    window.addEventListener(
+      "ontouchstart" in window ? "touchdown" : "mousedown",
+      (event) => this.onMouseDown(event),
+      false
+    );
+    window.addEventListener(
+      "mousemove",
+      (event) => {
+        // calculate mouse position in normalized device coordinates
+        // (-1 to +1) for both components
+        const mouse = new THREE.Vector2();
+        mouse.x =
+          (event.clientX / this.renderer.domElement.clientWidth) * 2 - 1;
+        mouse.y =
+          -(event.clientY / this.renderer.domElement.clientHeight) * 2 + 1;
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, this.camera);
+
+        const intersects = raycaster.intersectObjects(this.remoteColliders);
+
+        this.intersects = intersects
+
+        if (!intersects.length ) {
+          document.body.style.cursor = "inherit";
+        }
+
+        if (intersects.length > 0) {
+          const object = intersects[0].object;
+          const players = this.remotePlayers.filter(function (player) {
+            if (player.collider !== undefined && player.collider == object) {
+              return true;
+            }
+          });
+    
+          if (players.length > 0) {
+            const player = players[0];
+            document.body.style.cursor = "pointer";
+          }
+        }
+      },
+      false
+    );
+
+    window.addEventListener("resize", () => this.onWindowResize(), false);
+
+    // Load scene
     this.player = new PlayerLocal(this);
-
-    this.loadEnvironment(loader);
 
     this.speechBubble = new SpeechBubble(this, "", 150);
     this.speechBubble.mesh.position.set(0, 350, 0);
@@ -188,73 +226,102 @@ export class Game {
       onMove: this.playerControl,
       game: this,
     });
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.container.appendChild(this.renderer.domElement);
-
-    if ("ontouchstart" in window) {
-      window.addEventListener(
-        "touchdown",
-        (event) => game.onMouseDown(event),
-        false
-      );
-    } else {
-      window.addEventListener(
-        "mousedown",
-        (event) => game.onMouseDown(event),
-        false
-      );
-    }
-
-    window.addEventListener("resize", () => game.onWindowResize(), false);
+    // this.loadEnvironment();
+    this.loadNextAnim();
   }
 
-  loadEnvironment(loader) {
-    const game = this;
-    loader.load(`${this.assetsPath}fbx/town.fbx`, function (object) {
-      game.environment = object;
-      game.colliders = [];
-      game.scene.add(object);
-      object.traverse(function (child) {
-        if (child.isMesh) {
-          if (child.name.startsWith("proxy")) {
-            game.colliders.push(child);
-            child.material.visible = false;
-          } else {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        }
-      });
-
-      const tloader = new THREE.CubeTextureLoader();
-      tloader.setPath(`${game.assetsPath}/images/`);
-
-      var textureCube = tloader.load([
-        "px.jpg",
-        "nx.jpg",
-        "py.jpg",
-        "ny.jpg",
-        "pz.jpg",
-        "nz.jpg",
-      ]);
-
-      game.scene.background = textureCube;
-
-      game.loadNextAnim(loader);
+  initSfx() {
+    this.sfx = {};
+    this.sfx.context = new (window.AudioContext || window.webkitAudioContext)();
+    this.sfx.gliss = new SFX({
+      context: this.sfx.context,
+      src: {
+        mp3: `${this.assetsPath}sfx/gliss.mp3`,
+        ogg: `${this.assetsPath}sfx/gliss.ogg`,
+      },
+      loop: false,
+      volume: 0.3,
     });
   }
 
-  loadNextAnim(loader) {
+  set activeCamera(object) {
+    this.cameras.active = object;
+  }
+  get activeCamera() {
+    return this.cameras.active;
+  }
+
+  init() {}
+
+  // Scene proxy
+  add(what) {
+    this.sceneProxy.add(what);
+  }
+
+  undo(what) {
+    this.sceneProxy.undo();
+  }
+
+  reset() {
+    const { scene } = this;
+    scene.children.forEach((child) => {
+      scene.remove(child);
+    });
+    // this.init()
+  }
+
+  loadEnvironment() {
+    const loader = new FBXLoader();
+
+    const game = this;
+    return new Promise((resolve, reject) => {
+      const url = `${this.assetsPath}fbx/town.fbx`;
+      loader.load(url, (object) => {
+        game.environment = object;
+        game.colliders = [];
+        object.name = url;
+        game.add(object);
+        object.traverse(function (child) {
+          if (child.isMesh) {
+            if (child.name.startsWith("proxy")) {
+              game.colliders.push(child);
+              child.material.visible = false;
+            } else {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          }
+        });
+
+        const tloader = new THREE.CubeTextureLoader();
+        tloader.setPath(`${game.assetsPath}/images/`);
+
+        var textureCube = tloader.load([
+          "px.jpg",
+          "nx.jpg",
+          "py.jpg",
+          "ny.jpg",
+          "pz.jpg",
+          "nz.jpg",
+        ]);
+
+        game.scene.background = textureCube;
+
+        // game.loadNextAnim(loader);
+        resolve(object);
+      });
+    });
+  }
+
+  loadNextAnim() {
+    const loader = new FBXLoader();
+
     let anim = this.anims.pop();
     const game = this;
     loader.load(`${this.assetsPath}fbx/anims/${anim}.fbx`, function (object) {
       game.player.animations[anim] = object.animations[0];
       if (game.anims.length > 0) {
-        game.loadNextAnim(loader);
+        game.loadNextAnim();
       } else {
         delete game.anims;
         game.action = "Idle";
@@ -412,6 +479,8 @@ export class Game {
     )
       return;
 
+    const chat = document.getElementById("chat");
+
     // calculate mouse position in normalized device coordinates
     // (-1 to +1) for both components
     const mouse = new THREE.Vector2();
@@ -422,7 +491,6 @@ export class Game {
     raycaster.setFromCamera(mouse, this.camera);
 
     const intersects = raycaster.intersectObjects(this.remoteColliders);
-    const chat = document.getElementById("chat");
 
     if (intersects.length > 0) {
       const object = intersects[0].object;
@@ -431,8 +499,13 @@ export class Game {
           return true;
         }
       });
+
+      // document.body.style.cursor = "inherit";
+
       if (players.length > 0) {
         const player = players[0];
+
+        // document.body.style.cursor = "pointer";
         console.log(`onMouseDown: player ${player.id}`);
         this.speechBubble.player = player;
         this.speechBubble.update("");
