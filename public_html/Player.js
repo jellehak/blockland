@@ -1,6 +1,4 @@
-import "./libs/FBXLoader.js";
-
-const { FBXLoader } = THREE;
+import { GLTFLoader, FBXLoader, THREE } from "./three.js";
 
 export class Player {
   constructor(game = {}, options) {
@@ -151,6 +149,11 @@ export class Player {
   }
 }
 
+class FakeSocket {
+  on(event = "", cb = () => {}) {}
+  emit() {}
+}
+
 export class PlayerLocal extends Player {
   constructor(game, model) {
     super(game, model);
@@ -162,7 +165,9 @@ export class PlayerLocal extends Player {
     };
 
     const player = this;
-    const socket = io.connect();
+    // const socket = io.connect();
+    const socket = new FakeSocket()
+
     socket.on("setId", (data) => {
       player.id = data.id;
     });

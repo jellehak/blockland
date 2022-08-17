@@ -4,6 +4,16 @@
 
 # Usage
 ```js
+import { Game } from "./game.js";
+
+const game = new Game();
+window.game = game;
+console.log("Feel free to interact with `game`");
+
+// Add to scene
+game.add()
+game.undo()
+
 // # Camera
 game.cameras
 // Change camera
@@ -29,6 +39,11 @@ game.player.state.TURN = 2
 // World
 await game.loadEnvironment()
 
+// Player
+await game.loadNextAnim()
+
+// Add object
+await game.load("https://tracks-earth.github.io/airplanes/models/paraglider.glb")
 
 // Mods
 import("./mods/skybox/load.js").then(ns=>ns.default(game))

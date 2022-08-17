@@ -6,6 +6,49 @@ import { Player, PlayerLocal } from "./Player.js";
 // import "./libs/inflate.min.js"
 import "./libs/FBXLoader.js";
 
+// import { GLTFLoader, FBXLoader } from "./three.js";
+// import { THREE } from "./three.js";
+const { THREE } = window;
+const { FBXLoader } = THREE;
+export class ModelLoader {
+  async load(url = "") {
+    const container = new THREE.Object3D();
+    container.name = "player";
+    // scene.add(container);
+
+    const gltf = await new GLTFLoader().loadAsync(url);
+    const model = gltf.scene;
+    model.name = "model";
+    model.traverse(function (object) {
+      // if (object.isMesh)
+      object.castShadow = true;
+    });
+    container.add(model);
+    // scene.add(model);
+
+    // Helper
+    // const { THREE, scene } = ctx;
+    {
+      const box = new THREE.BoxHelper(model, 0xffff00);
+      container.add(box);
+    }
+
+    // NOTE raypicking with glb files
+    // https://stackoverflow.com/questions/15492857/any-way-to-get-a-bounding-box-from-a-three-js-object3d
+    // geometry.computeBoundingBox();  // otherwise geometry.boundingBox will be undefined
+    // Nice example https://codepen.io/Ip3ly5/project/editor/ZLRQNr#0
+
+    // Add animation object
+    // Usage:
+    // last.actions['Idle'].play()
+    const mixer = new THREE.AnimationMixer(model);
+    const actions = {};
+    gltf.animations.forEach((a) => {
+      actions[a.name] = mixer.clipAction(a);
+    });
+    gltf.actions = actions;
+  }
+}
 class SceneProxy {
   constructor(scene) {
     this.stack = [];
@@ -20,7 +63,6 @@ class SceneProxy {
   undo() {}
 }
 
-const { FBXLoader } = THREE;
 /**
  * @example
  */
@@ -55,6 +97,8 @@ export class Keyboard {
 
 export class Game {
   constructor() {
+    const game = this;
+
     this.modes = Object.freeze({
       NONE: Symbol("none"),
       PRELOAD: Symbol("preload"),
@@ -76,6 +120,7 @@ export class Game {
     this.animations = {};
     this.assetsPath = "assets/";
 
+    this.modelLoader = new ModelLoader();
     this.remotePlayers = [];
     this.remoteColliders = [];
     this.initialisingPlayers = [];
@@ -191,9 +236,9 @@ export class Game {
 
         const intersects = raycaster.intersectObjects(this.remoteColliders);
 
-        this.intersects = intersects
+        this.intersects = intersects;
 
-        if (!intersects.length ) {
+        if (!intersects.length) {
           document.body.style.cursor = "inherit";
         }
 
@@ -204,7 +249,7 @@ export class Game {
               return true;
             }
           });
-    
+
           if (players.length > 0) {
             const player = players[0];
             document.body.style.cursor = "pointer";
@@ -227,7 +272,70 @@ export class Game {
       game: this,
     });
     // this.loadEnvironment();
-    this.loadNextAnim();
+    // this.loadNextAnim();
+
+    // Start animation
+    game.animate();
+  }
+
+  play() {
+    this.playing = true;
+    this.animate();
+  }
+  stop() {
+    this.playing = false;
+  }
+
+  animate() {
+    const game = this;
+    const dt = this.clock.getDelta();
+
+    requestAnimationFrame(function () {
+      game.animate();
+    });
+
+    this.updateRemotePlayers(dt);
+
+    if (this.player.mixer != undefined && this.mode == this.modes.ACTIVE)
+      this.player.mixer.update(dt);
+
+    if (this.player.action == "Walking") {
+      const elapsedTime = Date.now() - this.player.actionTime;
+      if (elapsedTime > 1000 && this.player.motion.forward > 0) {
+        this.player.action = "Running";
+      }
+    }
+
+    if (this.player.motion !== undefined) this.player.move(dt);
+
+    if (
+      this.cameras != undefined &&
+      this.cameras.active != undefined &&
+      this.player !== undefined &&
+      this.player.object !== undefined
+    ) {
+      this.camera.position.lerp(
+        this.cameras.active.getWorldPosition(new THREE.Vector3()),
+        0.05
+      );
+      const pos = this.player.object.position.clone();
+      if (this.cameras.active == this.cameras.chat) {
+        pos.y += 200;
+      } else {
+        pos.y += 300;
+      }
+      this.camera.lookAt(pos);
+    }
+
+    if (this.sun !== undefined) {
+      this.sun.position.copy(this.camera.position);
+      this.sun.position.y += 10;
+    }
+
+    if (this.speechBubble !== undefined)
+      this.speechBubble.show(this.camera.position);
+
+    this.renderer.render(this.scene, this.camera);
   }
 
   initSfx() {
@@ -270,12 +378,12 @@ export class Game {
     // this.init()
   }
 
-  loadEnvironment() {
+  loadEnvironment(uri = "fbx/town.fbx") {
     const loader = new FBXLoader();
 
     const game = this;
     return new Promise((resolve, reject) => {
-      const url = `${this.assetsPath}fbx/town.fbx`;
+      const url = `${this.assetsPath}${uri}`;
       loader.load(url, (object) => {
         game.environment = object;
         game.colliders = [];
@@ -295,7 +403,6 @@ export class Game {
 
         const tloader = new THREE.CubeTextureLoader();
         tloader.setPath(`${game.assetsPath}/images/`);
-
         var textureCube = tloader.load([
           "px.jpg",
           "nx.jpg",
@@ -304,12 +411,28 @@ export class Game {
           "pz.jpg",
           "nz.jpg",
         ]);
-
         game.scene.background = textureCube;
 
-        // game.loadNextAnim(loader);
         resolve(object);
       });
+    });
+  }
+
+  load() {
+    const loader = new GBLLoader();
+
+    let anim = this.anims.pop();
+    const game = this;
+    loader.load(`${this.assetsPath}fbx/anims/${anim}.fbx`, function (object) {
+      game.player.animations[anim] = object.animations[0];
+      if (game.anims.length > 0) {
+        game.loadNextAnim();
+      } else {
+        delete game.anims;
+        game.action = "Idle";
+        game.mode = game.modes.ACTIVE;
+        game.animate();
+      }
     });
   }
 
@@ -326,7 +449,7 @@ export class Game {
         delete game.anims;
         game.action = "Idle";
         game.mode = game.modes.ACTIVE;
-        game.animate();
+        // game.animate();
       }
     });
   }
@@ -544,58 +667,6 @@ export class Game {
     if (players.length == 0) return;
 
     return players[0];
-  }
-
-  animate() {
-    const game = this;
-    const dt = this.clock.getDelta();
-
-    requestAnimationFrame(function () {
-      game.animate();
-    });
-
-    this.updateRemotePlayers(dt);
-
-    if (this.player.mixer != undefined && this.mode == this.modes.ACTIVE)
-      this.player.mixer.update(dt);
-
-    if (this.player.action == "Walking") {
-      const elapsedTime = Date.now() - this.player.actionTime;
-      if (elapsedTime > 1000 && this.player.motion.forward > 0) {
-        this.player.action = "Running";
-      }
-    }
-
-    if (this.player.motion !== undefined) this.player.move(dt);
-
-    if (
-      this.cameras != undefined &&
-      this.cameras.active != undefined &&
-      this.player !== undefined &&
-      this.player.object !== undefined
-    ) {
-      this.camera.position.lerp(
-        this.cameras.active.getWorldPosition(new THREE.Vector3()),
-        0.05
-      );
-      const pos = this.player.object.position.clone();
-      if (this.cameras.active == this.cameras.chat) {
-        pos.y += 200;
-      } else {
-        pos.y += 300;
-      }
-      this.camera.lookAt(pos);
-    }
-
-    if (this.sun !== undefined) {
-      this.sun.position.copy(this.camera.position);
-      this.sun.position.y += 10;
-    }
-
-    if (this.speechBubble !== undefined)
-      this.speechBubble.show(this.camera.position);
-
-    this.renderer.render(this.scene, this.camera);
   }
 }
 

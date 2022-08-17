@@ -4,6 +4,30 @@ const game = new Game();
 window.game = game;
 console.log("Feel free to interact with `game`");
 
+// MOD skybox
+{
+  import("./mods/skybox/load.js").then(ns=>ns.default(game))
+}
+
+// OrbitControl https://threejs.org/docs/#examples/en/controls/OrbitControls
+// import { OrbitControls } from 'https://unpkg.com/three@0.110.0/examples/jsm/controls/OrbitControls.js'
+// {
+
+//   const {camera, renderer} = game
+//   const controls = new OrbitControls( camera, renderer.domElement );
+
+//   function animate() {
+
+//     requestAnimationFrame( animate );
+  
+//     // required if controls.enableDamping or controls.autoRotate are set to true
+//     controls.update();
+  
+//     // renderer.render( scene, camera );
+//   }
+//   animate()
+// }
+
 // MOD: Keyboard input
 {
   const keyboard = new Keyboard();
