@@ -6,7 +6,7 @@ console.log("Feel free to interact with `game`");
 
 // MOD skybox
 {
-  import("./mods/skybox/load.js").then(ns=>ns.default(game))
+  import("./mods/skybox/load.js").then((ns) => ns.default(game));
 }
 
 // OrbitControl https://threejs.org/docs/#examples/en/controls/OrbitControls
@@ -19,10 +19,10 @@ console.log("Feel free to interact with `game`");
 //   function animate() {
 
 //     requestAnimationFrame( animate );
-  
+
 //     // required if controls.enableDamping or controls.autoRotate are set to true
 //     controls.update();
-  
+
 //     // renderer.render( scene, camera );
 //   }
 //   animate()
@@ -31,17 +31,17 @@ console.log("Feel free to interact with `game`");
 // MOD: Keyboard input
 {
   const keyboard = new Keyboard();
-  
+
   const input = {
     keyboard,
     state: {
-        FORWARD: 0.8,
-        TURN: 0.4 
+      FORWARD: 0.8,
+      TURN: 0.4,
     },
-    dispose() {}
-  }
+    dispose() {},
+  };
   // Expose
-  window.input = input
+  window.input = input;
 
   function update() {
     let forward = 0;
@@ -61,16 +61,15 @@ console.log("Feel free to interact with `game`");
       turn = input.state.TURN;
     }
 
-    // if(keyboard.keysPressed) { console.log(keyboard.keysPressed) }
-    // console.log(keyboard.keysPressed)
-
     game.playerControl(forward, turn);
 
     requestAnimationFrame(update);
   }
+
+  // Wait some time
   setTimeout(() => {
-      update();
-  }, 3000)
+    update();
+  }, 3000);
 }
 
 // MOD: Stats
@@ -92,3 +91,10 @@ console.log("Feel free to interact with `game`");
 }
 
 // MOD: Teleport
+
+{
+  // game.loadEnvironment();
+  // game.loadNextAnim();
+  game.stats();
+  game.play()
+}
