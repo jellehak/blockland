@@ -237,7 +237,7 @@ export class Game {
         if (intersects.length > 0) {
           const object = intersects[0].object;
           const players = this.remotePlayers.filter(function (player) {
-            if (player.collider !== undefined && player.collider == object) {
+            if (player.collider && player.collider == object) {
               return true;
             }
           });
@@ -267,7 +267,7 @@ export class Game {
     // this.loadNextAnim();
 
     // Start animation
-    game.animate();
+    // game.animate();
   }
 
   play() {
@@ -294,7 +294,7 @@ export class Game {
 
     this.updateRemotePlayers(dt);
 
-    if (this.player.mixer != undefined && this.mode == this.modes.ACTIVE)
+    if (this.player.mixer && this.mode == this.modes.ACTIVE)
       this.player.mixer.update(dt);
 
     if (this.player.action == "Walking") {
@@ -304,13 +304,13 @@ export class Game {
       }
     }
 
-    if (this.player.motion !== undefined) this.player.move(dt);
+    if (this.player.motion) this.player.move(dt);
 
     if (
-      this.cameras != undefined &&
-      this.cameras.active != undefined &&
-      this.player !== undefined &&
-      this.player.object !== undefined
+      this.cameras &&
+      this.cameras.active &&
+      this.player &&
+      this.player.object
     ) {
       this.camera.position.lerp(
         this.cameras.active.getWorldPosition(new THREE.Vector3()),
@@ -325,12 +325,12 @@ export class Game {
       this.camera.lookAt(pos);
     }
 
-    if (this.sun !== undefined) {
+    if (this.sun) {
       this.sun.position.copy(this.camera.position);
       this.sun.position.y += 10;
     }
 
-    if (this.speechBubble !== undefined)
+    if (this.speechBubble)
       this.speechBubble.show(this.camera.position);
 
     this.renderer.render(this.scene, this.camera);
@@ -356,8 +356,6 @@ export class Game {
   get activeCamera() {
     return this.cameras.active;
   }
-
-  init() {}
 
   // Scene proxy
   add(what) {
@@ -598,7 +596,7 @@ export class Game {
     if (intersects.length > 0) {
       const object = intersects[0].object;
       const players = this.remotePlayers.filter(function (player) {
-        if (player.collider !== undefined && player.collider == object) {
+        if (player.collider && player.collider == object) {
           return true;
         }
       });
@@ -679,7 +677,7 @@ class SpeechBubble {
         self.mesh.material.map = texture;
         self.mesh.material.transparent = true;
         self.mesh.material.needsUpdate = true;
-        if (msg !== undefined) self.update(msg);
+        if (msg) self.update(msg);
       },
 
       // onProgress callback currently not supported
@@ -765,7 +763,7 @@ class SpeechBubble {
   }
 
   show(pos) {
-    if (this.mesh !== undefined && this.player !== undefined) {
+    if (this.mesh && this.player) {
       this.mesh.position.set(
         this.player.object.position.x,
         this.player.object.position.y + 380,
