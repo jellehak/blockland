@@ -424,24 +424,6 @@ export class Game {
     });
   }
 
-  load() {
-    const loader = new GBLLoader();
-
-    let anim = this.anims.pop();
-    const game = this;
-    loader.load(`${this.assetsPath}fbx/anims/${anim}.fbx`, function (object) {
-      game.player.animations[anim] = object.animations[0];
-      if (game.anims.length > 0) {
-        game.loadNextAnim();
-      } else {
-        delete game.anims;
-        game.action = "Idle";
-        game.mode = game.modes.ACTIVE;
-        game.animate();
-      }
-    });
-  }
-
   loadNextAnim() {
     const loader = new FBXLoader();
 
