@@ -4,6 +4,7 @@ const http = require("http").Server(app);
 const { instrument } = require("@socket.io/admin-ui");
 
 const io = require("socket.io")(http, {
+  serveClient: false,
   cors: {
     origin: [
       "https://admin.socket.io",
@@ -14,14 +15,12 @@ const io = require("socket.io")(http, {
   },
 });
 
+// Expose
+global.io = io
+
 instrument(io, {
   auth: false,
 });
-
-// app.use(express.static("public_html/"));
-// app.get("/", function (req, res) {
-//   res.sendFile(__dirname + "/public_html/index.html");
-// });
 
 io.sockets.on("connection", function (socket) {
   socket.userData = { x: 0, y: 0, z: 0, heading: 0 }; //Default values;
@@ -30,7 +29,7 @@ io.sockets.on("connection", function (socket) {
   socket.emit("setId", { id: socket.id });
 
   socket.on("disconnect", function () {
-    console.log(`Player ${socket.id} disconnected`);
+    console.log(`Player ${socket.userData.model} ${socket.id} disconnected`);
     socket.broadcast.emit("deletePlayer", { id: socket.id });
   });
 
@@ -50,7 +49,8 @@ io.sockets.on("connection", function (socket) {
     socket.userData.y = data.y;
     socket.userData.z = data.z;
     socket.userData.heading = data.h;
-    (socket.userData.pb = data.pb), (socket.userData.action = data.action);
+    socket.userData.pb = data.pb
+    socket.userData.action = data.action
   });
 
   socket.on("chat message", function (data) {
@@ -60,20 +60,26 @@ io.sockets.on("connection", function (socket) {
       message: data.message,
     });
   });
+
+  socket.on("all", function (data) {
+    socket.emit("all", [...io.sockets.sockets].map(e => e.userData))
+  });
 });
 
 http.listen(process.env.PORT || 2002, function () {
-  console.log("listening on http://localhost:2002 - origin set");
+  console.log("listening on http://localhost:2002");
 });
 
 function doUpdate() {
   const nsp = io.of("/");
   let pack = [];
 
-  for (let id in io.sockets.sockets) {
-    const socket = nsp.connected[id];
+  // const hasModel = [...io.sockets.sockets].map(([key,value]) => value.userData)
+  // const hasModel = [...io.sockets.sockets].map(([key,socket]) => socket).filter(u => u.userData.model)
+  for (const [id, socket] of io.sockets.sockets) {
+    // const socket = nsp.connected[id];
     //Only push sockets that have been initialised
-    if (!socket.userData.model) {
+    if (socket.userData.model !== undefined) {
       return;
     }
     pack.push({
@@ -88,7 +94,9 @@ function doUpdate() {
       action: socket.userData.action,
     });
   }
+  // console.log(pack.length)
   if (pack.length > 0) io.emit("remoteData", pack);
 }
 
-setInterval(doUpdate, 40);
+// setInterval(doUpdate, 40);
+setInterval(doUpdate, 400);
