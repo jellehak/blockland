@@ -161,16 +161,8 @@ export class Game {
       },
     };
 
-    this.anims.forEach((anim) => {
-      options.assets.push(`${this.assetsPath}fbx/anims/${anim}.fbx`);
-    });
-    options.assets.push(`${this.assetsPath}fbx/town.fbx`);
-
-    this.mode = this.modes.PRELOAD;
 
     this.clock = new THREE.Clock();
-
-    const preloader = new Preloader(options);
 
     window.onError = function (error) {
       console.error(JSON.stringify(error));
