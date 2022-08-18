@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { JoyStick, SFX } from "./libs/toon3d.esm.js";
+import { JoyStick, SFX } from "./toon3d.esm.js";
 import { Player, PlayerLocal } from "./Player.js";
 import { ModelLoader } from "./ModelLoader.js";
 import { THREE } from "./three.js";
 import { GLTFLoader, FBXLoader } from "./three.js";
+import { SpeechBubble } from "./SpeechBubble.js";
 class SceneProxy {
   constructor(scene) {
     this.stack = [];
@@ -75,7 +76,6 @@ export class Game {
 
     this.THREE = THREE;
     this.container;
-    this.player = {};
     this.cameras;
     this.camera;
     this.scene = new THREE.Scene();
@@ -83,23 +83,15 @@ export class Game {
     this.renderer;
     this.animations = {};
     this.assetsPath = "assets/";
-
-    this.entities = {}
-
     this.modelLoader = new ModelLoader();
+
+    // Entities
+    this.entities = {}
+    this.player = {};
     this.remotePlayers = [];
     this.remoteColliders = [];
     this.initialisingPlayers = [];
     this.remoteData = [];
-
-    this.messages = {
-      text: ["Welcome to Blockland", "GOOD LUCK!"],
-      index: 0,
-    };
-
-    this.container = document.createElement("div");
-    this.container.style.height = "100%";
-    document.body.appendChild(this.container);
 
     const sfxExt = SFX.supportsAudioType("mp3") ? "mp3" : "ogg";
 
@@ -148,6 +140,9 @@ export class Game {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this.container = document.createElement("div");
+    this.container.style.height = "100%";
+    document.body.appendChild(this.container);
     this.container.appendChild(this.renderer.domElement);
 
     window.addEventListener(
@@ -155,6 +150,8 @@ export class Game {
       (event) => this.onMouseDown(event),
       false
     );
+
+    // Set pointer for clickable objects
     window.addEventListener(
       "mousemove",
       (event) => {
@@ -337,13 +334,6 @@ export class Game {
     return new Promise((resolve, reject) => {
       loader.load(`${url}`, function (object) {
         game.player.animations[key] = object.animations[0];
-        // if (game.anims.length > 0) {
-        //   game.loadNextAnim();
-        // } else {
-        //   delete game.anims;
-        //   game.action = "Idle";
-        //   game.mode = game.modes.ACTIVE;
-        // }
         resolve(object);
       });
     });
@@ -406,7 +396,7 @@ export class Game {
     this.activeCamera = this.cameras.back;
   }
 
-  showMessage(msg, fontSize = 20, onOK = null) {
+  showMessage(msg = "", fontSize = 20, onOK = null) {
     const txt = document.getElementById("message_text");
     txt.innerHTML = msg;
     txt.style.fontSize = fontSize + "px";
@@ -439,8 +429,9 @@ export class Game {
       this.remoteData.length == 0 ||
       !this.player ||
       !this.player.id
-    )
+    ) {
       return;
+    }
 
     const newPlayers = [];
     const game = this;
@@ -448,39 +439,41 @@ export class Game {
     const remotePlayers = [];
     const remoteColliders = [];
 
-    this.remoteData.forEach(function (data) {
-      if (game.player.id != data.id) {
-        //Is this player being initialised?
-        let iplayer;
-        game.initialisingPlayers.forEach(function (player) {
-          if (player.id == data.id) iplayer = player;
-        });
-        //If not being initialised check the remotePlayers array
-        if (!iplayer) {
-          let rplayer;
-          game.remotePlayers.forEach(function (player) {
-            if (player.id == data.id) rplayer = player;
+    this.remoteData
+      .forEach(function (data) {
+        if (game.player.id != data.id) {
+          //Is this player being initialised?
+          let iplayer;
+          game.initialisingPlayers.forEach(function (player) {
+            if (player.id == data.id) iplayer = player;
           });
-          if (!rplayer) {
-            //Initialise player
-            game.initialisingPlayers.push(new Player(game, data));
-          } else {
-            //Player exists
-            remotePlayers.push(rplayer);
-            remoteColliders.push(rplayer.collider);
+          //If not being initialised check the remotePlayers array
+          if (!iplayer) {
+            let rplayer;
+            game.remotePlayers.forEach(function (player) {
+              if (player.id == data.id) rplayer = player;
+            });
+            if (!rplayer) {
+              //Initialise player
+              game.initialisingPlayers.push(new Player(game, data));
+            } else {
+              //Player exists
+              remotePlayers.push(rplayer);
+              remoteColliders.push(rplayer.collider);
+            }
           }
         }
-      }
-    });
+      });
 
-    this.scene.children.forEach(function (object) {
-      if (
-        object.userData.remotePlayer &&
-        game.getRemotePlayerById(object.userData.id) == undefined
-      ) {
-        game.scene.remove(object);
-      }
-    });
+    this.scene.children
+      .forEach(function (object) {
+        if (
+          object.userData.remotePlayer &&
+          game.getRemotePlayerById(object.userData.id) == undefined
+        ) {
+          game.scene.remove(object);
+        }
+      });
 
     this.remotePlayers = remotePlayers;
     this.remoteColliders = remoteColliders;
@@ -566,128 +559,3 @@ export class Game {
   }
 }
 
-class SpeechBubble {
-  constructor(game, msg, size = 1) {
-    this.config = {
-      font: "Calibri",
-      size: 24,
-      padding: 10,
-      colour: "#222",
-      width: 256,
-      height: 256,
-    };
-
-    const planeGeometry = new THREE.PlaneGeometry(size, size);
-    const planeMaterial = new THREE.MeshBasicMaterial();
-    this.mesh = new THREE.Mesh(planeGeometry, planeMaterial);
-    game.scene.add(this.mesh);
-
-    const self = this;
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      // resource URL
-      `${game.assetsPath}images/speech.png`,
-
-      // onLoad callback
-      function (texture) {
-        // in this example we create the material when the texture is loaded
-        self.img = texture.image;
-        self.mesh.material.map = texture;
-        self.mesh.material.transparent = true;
-        self.mesh.material.needsUpdate = true;
-        if (msg) self.update(msg);
-      },
-
-      // onProgress callback currently not supported
-      undefined,
-
-      // onError callback
-      function (err) {
-        console.error("An error happened.");
-      }
-    );
-  }
-
-  update(msg) {
-    if (this.mesh === undefined) return;
-
-    let context = this.context;
-
-    if (this.mesh.userData.context === undefined) {
-      const canvas = this.createOffscreenCanvas(
-        this.config.width,
-        this.config.height
-      );
-      this.context = canvas.getContext("2d");
-      context = this.context;
-      context.font = `${this.config.size}pt ${this.config.font}`;
-      context.fillStyle = this.config.colour;
-      context.textAlign = "center";
-      this.mesh.material.map = new THREE.CanvasTexture(canvas);
-    }
-
-    const bg = this.img;
-    context.clearRect(0, 0, this.config.width, this.config.height);
-    context.drawImage(
-      bg,
-      0,
-      0,
-      bg.width,
-      bg.height,
-      0,
-      0,
-      this.config.width,
-      this.config.height
-    );
-    this.wrapText(msg, context);
-
-    this.mesh.material.map.needsUpdate = true;
-  }
-
-  createOffscreenCanvas(w, h) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    return canvas;
-  }
-
-  wrapText(text, context) {
-    const words = text.split(" ");
-    let line = "";
-    const lines = [];
-    const maxWidth = this.config.width - 2 * this.config.padding;
-    const lineHeight = this.config.size + 8;
-
-    words.forEach(function (word) {
-      const testLine = `${line}${word} `;
-      const metrics = context.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth) {
-        lines.push(line);
-        line = `${word} `;
-      } else {
-        line = testLine;
-      }
-    });
-
-    if (line != "") lines.push(line);
-
-    let y = (this.config.height - lines.length * lineHeight) / 2;
-
-    lines.forEach(function (line) {
-      context.fillText(line, 128, y);
-      y += lineHeight;
-    });
-  }
-
-  show(pos) {
-    if (this.mesh && this.player) {
-      this.mesh.position.set(
-        this.player.object.position.x,
-        this.player.object.position.y + 380,
-        this.player.object.position.z
-      );
-      this.mesh.lookAt(pos);
-    }
-  }
-}

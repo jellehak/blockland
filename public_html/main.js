@@ -1,4 +1,4 @@
-import { Game, Keyboard } from "./game.js";
+import { Game, Keyboard } from "./src/game.js";
 
 const game = new Game();
 window.game = game;
@@ -96,6 +96,7 @@ console.log("Feel free to interact with `game`");
 }
 
 // Basic scene viewer
+// https://lil-gui.georgealways.com/
 {
   const { GUI } = await import(
     "https://cdn.jsdelivr.net/npm/lil-gui@0.17/+esm"
@@ -184,8 +185,16 @@ console.log("Feel free to interact with `game`");
   scene.add(axesHelper);
 }
 
+// GUI: Camera
 {
+  const {gui} = window
+  gui.add( game, 'activeCamera', game.cameras )
+}
 
+// GUI: Entity Manager
+{
+  const {gui} = window
+  // gui.add( game, 'player', game.players )
 }
 
 // MAIN

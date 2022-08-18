@@ -71,7 +71,7 @@ export class Player {
       );
 
       player.object = new THREE.Object3D();
-      
+
       // player.object.position.set(3122, 0, -173);
       // player.object.rotation.set(0, 2.6, 0);
 
@@ -162,13 +162,16 @@ export class PlayerLocal extends Player {
     this.state = {
       RUN: 500,
       WALK: 150,
-      TURN: 1
+      TURN: 1,
     };
 
     const player = this;
     const socket = io.connect("http://localhost:2002");
     // const socket = new FakeSocket()
 
+    socket.on("setId", (data) => {
+      player.id = data.id;
+    });
     socket.on("setId", (data) => {
       player.id = data.id;
     });

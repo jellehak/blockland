@@ -47,6 +47,11 @@ await game.load("https://tracks-earth.github.io/airplanes/models/paraglider.glb"
 
 // Mods
 import("./mods/skybox/load.js").then(ns=>ns.default(game))
+import("./mods/sand/load.js").then(ns=>ns.default(game))
+
+// Add NPC
+
+
 ```
 
 
