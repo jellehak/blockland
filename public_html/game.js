@@ -290,8 +290,14 @@ export class Game {
     const game = this;
     const dt = this.clock.getDelta();
 
-    requestAnimationFrame(function () {
-      game.animate();
+    requestAnimationFrame(() => {
+      // console.time('animate')
+      if(this.playing) {
+        game.animate();
+        // this.renderer.render(this.scene, this.camera);
+      }
+      // console.timeEnd('animate')
+
     });
 
     this.updateRemotePlayers(dt);
