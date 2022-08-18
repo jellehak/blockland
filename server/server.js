@@ -18,14 +18,43 @@ const io = require("socket.io")(http, {
 // Expose
 global.io = io
 
-instrument(io, {
-  auth: false,
-});
+const state = {}
 
-io.sockets.on("connection", function (socket) {
+// instrument(io, {
+//   auth: false,
+// });
+
+app.get('/', (req, res) => {
+  res.json({
+    links: {
+      nodes: "http://localhost:2002/nodes",
+      sockets: "http://localhost:2002/sockets"
+    }
+  })
+})
+app.get('/nodes', (req, res) => {
+  const resp = [...io.sockets.sockets]
+  .map(([key,socket]) => ({
+    id: key, 
+    ...socket.userData,
+  }))
+  res.json(resp)
+})
+app.get('/sockets', (req, res) => {
+  const resp = [...io.sockets.sockets]
+  .map(([key,socket]) => ({
+    id: key, 
+    userData: socket.userData,
+    headers: socket.handshake
+  }))
+  res.json(resp)
+})
+
+io.on("connection", function (socket) {
   socket.userData = { x: 0, y: 0, z: 0, heading: 0 }; //Default values;
 
   console.log(`${socket.id} connected`);
+  // DEPRECATE
   socket.emit("setId", { id: socket.id });
 
   socket.on("disconnect", function () {
@@ -41,7 +70,8 @@ io.sockets.on("connection", function (socket) {
     socket.userData.y = data.y;
     socket.userData.z = data.z;
     socket.userData.heading = data.h;
-    (socket.userData.pb = data.pb), (socket.userData.action = "Idle");
+    socket.userData.pb = data.pb
+    socket.userData.action = "Idle"
   });
 
   socket.on("update", function (data) {
@@ -60,10 +90,6 @@ io.sockets.on("connection", function (socket) {
       message: data.message,
     });
   });
-
-  socket.on("all", function (data) {
-    socket.emit("all", [...io.sockets.sockets].map(e => e.userData))
-  });
 });
 
 http.listen(process.env.PORT || 2002, function () {
@@ -71,31 +97,14 @@ http.listen(process.env.PORT || 2002, function () {
 });
 
 function doUpdate() {
-  const nsp = io.of("/");
-  let pack = [];
-
-  // const hasModel = [...io.sockets.sockets].map(([key,value]) => value.userData)
-  // const hasModel = [...io.sockets.sockets].map(([key,socket]) => socket).filter(u => u.userData.model)
-  for (const [id, socket] of io.sockets.sockets) {
-    // const socket = nsp.connected[id];
-    //Only push sockets that have been initialised
-    if (socket.userData.model !== undefined) {
-      return;
-    }
-    pack.push({
-      id: socket.id,
-      model: socket.userData.model,
-      colour: socket.userData.colour,
-      x: socket.userData.x,
-      y: socket.userData.y,
-      z: socket.userData.z,
-      heading: socket.userData.heading,
-      pb: socket.userData.pb,
-      action: socket.userData.action,
-    });
-  }
-  // console.log(pack.length)
-  if (pack.length > 0) io.emit("remoteData", pack);
+  const resp = [...io.sockets.sockets]
+  .map(([key,socket]) => ({
+    id: key, 
+    ...socket.userData,
+  }))
+  
+  // Emit to all
+  io.emit("remoteData", resp);
 }
 
 // setInterval(doUpdate, 40);

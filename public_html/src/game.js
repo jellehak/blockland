@@ -342,7 +342,6 @@ export class Game {
   playerControl(forward = 0, turn = 0) {
     const { player } = this;
 
-    // console.log({...player}, forward, turn)
     turn = -turn;
 
     if (forward > 0.3) {
@@ -430,6 +429,7 @@ export class Game {
       !this.player ||
       !this.player.id
     ) {
+      // console.info('nothing to update')
       return;
     }
 

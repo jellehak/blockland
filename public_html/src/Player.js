@@ -155,6 +155,18 @@ class FakeSocket {
   emit() {}
 }
 
+class InitMessage {
+  constructor() {
+      this.model = ""
+      this.colour = ""
+      this.x = 0
+      this.y = 0
+      this.z = 0
+      this.h = 0
+      this.pb = 0
+  }
+}
+
 export class PlayerLocal extends Player {
   constructor(game, model) {
     super(game, model);
@@ -166,8 +178,8 @@ export class PlayerLocal extends Player {
     };
 
     const player = this;
-    // const socket = io.connect("http://localhost:2002");
-    const socket = new FakeSocket()
+    const socket = io.connect("http://localhost:2002");
+    // const socket = new FakeSocket()
 
     socket.on("setId", (data) => {
       player.id = data.id;
@@ -223,7 +235,7 @@ export class PlayerLocal extends Player {
 
   initSocket() {
     //console.log("PlayerLocal.initSocket");
-    this.socket.emit("init", {
+    const message = {
       model: this.model,
       colour: this.colour,
       x: this.object.position.x,
@@ -231,7 +243,9 @@ export class PlayerLocal extends Player {
       z: this.object.position.z,
       h: this.object.rotation.y,
       pb: this.object.rotation.x,
-    });
+    }
+    window.welcome = message
+    this.socket.emit("init", message );
   }
 
   updateSocket() {
@@ -239,7 +253,9 @@ export class PlayerLocal extends Player {
       return;
     }
 
-    //console.log(`PlayerLocal.updateSocket - rotation(${this.object.rotation.x.toFixed(1)},${this.object.rotation.y.toFixed(1)},${this.object.rotation.z.toFixed(1)})`);
+    // TODO Only update change?
+
+    // console.log(`PlayerLocal.updateSocket - rotation(${this.object.rotation.x.toFixed(1)},${this.object.rotation.y.toFixed(1)},${this.object.rotation.z.toFixed(1)})`);
     this.socket.emit("update", {
       x: this.object.position.x,
       y: this.object.position.y,

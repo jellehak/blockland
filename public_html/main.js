@@ -223,8 +223,17 @@ console.log("Feel free to interact with `game`");
 
 // NETWORK
 {
-  const {Network} = await import("./src/Network.js")
-  const network = new Network
+  // const {Network} = await import("./src/Network.js")
+  // const network = new Network()
 
-  window.network = network
+  // window.network = network
+
+  // const {gui} = window
+  // const folder = gui.addFolder(`Network`)
+  //   //.open(false);
+  // // folder.domElement.children[1].innerHTML = 'cool'
+
+  // folder.add(network, "server")
+  // folder.add(network, "status")
+  // folder.add(network, "id").listen()
 }

@@ -11,7 +11,8 @@
 
   <body>
     <!-- <script src="/socket.io/socket.io.js"></script> -->
-    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.js"></script>
+    <!-- <script src="http://localhost:2002/socket.io/socket.io.js"></script> -->
 
     <script type="importmap">
       {
@@ -21,7 +22,20 @@
       }
     </script>
 
-    <div id="app">{{ events }}</div>
+    <div id="app">
+      <div>
+        <h2>Utils</h2>
+        <a target="_blank" href="https://admin.socket.io/#/events"
+          >https://admin.socket.io/#/events</a
+        >
+      </div>
+      <div style="height: 400px; overflow: auto; overflow-y: scroll;">
+        <!-- <pre>{{ events }}</pre> -->
+        <div v-for="event in events">
+          {{event}}
+        </div>
+      </div>
+    </div>
 
     <script type="module">
       import { createApp } from "vue";
@@ -31,27 +45,79 @@
           return {
             message: "Hello Vue!",
             events: [],
+            player: {
+              model: "Housewife",
+              colour: "Black",
+              x: 0,
+              y: 0,
+              z: 0,
+              h: 0,
+              pb: 0,
+            },
+            others: {}
           };
         },
         async created() {
-          // NETWORK
+          // Socket
           {
-            const { Network } = await import("./src/Network.js");
-            const network = new Network();
+            const socket = io.connect("http://localhost:2002", {
+              transports: ["websocket"],
+              'forceNew':true
+            });
 
-            window.network = network;
+            // localStorage.debug = '*';
+            // localStorage.debug = 'socket.io-client:socket'
 
-            const {socket} = network
-            
+            const state = {
+              players: {},
+            };
+
+            socket.on("connect", () => {
+              console.log(socket.id); // x8WIv7-mJelg7on_ALbx
+              document.title = `Matrix (${socket.id})`
+            });
+
             socket.on("connect_error", (err) => {
               // curl "https://localhost:2002/socket.io/?EIO=4&transport=polling"
               console.log(`connect_error due to ${err.message}`);
             });
 
-            // socket.onAny((event, message) => {
-            //   console.log(event, message);
-            //   this.events.push(event, message);
-            // });
+            socket.onAny((event, message) => {
+              console.log(event, message);
+              this.events.push({ event, message });
+            });
+
+            socket.on("setId", (data) => {
+              this.id = data.id;
+            });
+            socket.on("remoteData", (data) => {
+              console.log(data);
+              // game.remoteData = data;
+              // TODO
+
+            });
+
+            const {player} = this
+
+            // Create fake player
+            socket.emit("init", player );
+
+            // Send update
+            setInterval(function() {
+              player.x += 0.1
+
+              const delta = {
+                x: player.x.toFixed(2),
+                y: player.y,
+                z: player.z,
+                h: player.h,
+                pb: player.pb,
+              }
+              socket.emit("update", delta);
+            }, 3000)
+
+            // Expose
+            window.socket = socket;
           }
         },
       }).mount("#app");
