@@ -166,12 +166,9 @@ export class PlayerLocal extends Player {
     };
 
     const player = this;
-    const socket = io.connect("http://localhost:2002");
-    // const socket = new FakeSocket()
+    // const socket = io.connect("http://localhost:2002");
+    const socket = new FakeSocket()
 
-    socket.on("setId", (data) => {
-      player.id = data.id;
-    });
     socket.on("setId", (data) => {
       player.id = data.id;
     });

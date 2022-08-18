@@ -44,7 +44,7 @@
         left: 50%;
         top: 50%;
         transform: translateX(-50%) translateY(-50%);
-        font-family: "Kavivanar", san-serif;
+        /* font-family: "Kavivanar", san-serif; */
         font-size: 40px;
         width: 80%;
         max-width: 280px;
@@ -85,14 +85,20 @@
       form input {
         border: 0;
         padding: 10px;
-        width: 88%;
-        margin-right: 0.5%;
+        width: 100%;
+        max-width: 600px;
       }
-      form button {
+      /* form button {
         width: 8%;
         background: rgb(130, 224, 255);
         border: none;
         padding: 10px;
+      } */
+
+      footer {
+        position: absolute;
+        bottom: 0px;
+        left: 0px;
       }
     </style>
   </head>
@@ -119,13 +125,18 @@
         <input id="m" autocomplete="off" /><button>Send</button>
       </form>
     </div>
+    
+    <footer>
+      <a target="_blank" href="/debug.html">debug</a>
+    </footer>
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script> -->
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script> -->
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script> -->
     <!-- <script src="https://code.jquery.com/jquery-1.11.1.js"></script> -->
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>
 
-    <script src="libs/inflate.min.js"></script>
+    <!-- <script src="libs/inflate.min.js"></script> -->
     <!-- <script src="libs/FBXLoader.js"></script> -->
     <!-- <script src="libs/Detector.js"></script> -->
     <script src="./main.js" type="module"></script>

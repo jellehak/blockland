@@ -1,17 +1,27 @@
 const express = require("express");
 const app = express();
 const http = require("http").Server(app);
+const { instrument } = require("@socket.io/admin-ui");
+
 const io = require("socket.io")(http, {
   cors: {
-    origin: ["https://admin.socket.io", "http://localhost:5173"],
+    origin: [
+      "https://admin.socket.io",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
     credentials: true,
   },
 });
 
-app.use(express.static("public_html/"));
-app.get("/", function (req, res) {
-  res.sendFile(__dirname + "/public_html/index.html");
+instrument(io, {
+  auth: false,
 });
+
+// app.use(express.static("public_html/"));
+// app.get("/", function (req, res) {
+//   res.sendFile(__dirname + "/public_html/index.html");
+// });
 
 io.sockets.on("connection", function (socket) {
   socket.userData = { x: 0, y: 0, z: 0, heading: 0 }; //Default values;
@@ -56,38 +66,29 @@ http.listen(process.env.PORT || 2002, function () {
   console.log("listening on http://localhost:2002 - origin set");
 });
 
-setInterval(function () {
+function doUpdate() {
   const nsp = io.of("/");
   let pack = [];
 
   for (let id in io.sockets.sockets) {
     const socket = nsp.connected[id];
     //Only push sockets that have been initialised
-    if (socket.userData.model !== undefined) {
-      pack.push({
-        id: socket.id,
-        model: socket.userData.model,
-        colour: socket.userData.colour,
-        x: socket.userData.x,
-        y: socket.userData.y,
-        z: socket.userData.z,
-        heading: socket.userData.heading,
-        pb: socket.userData.pb,
-        action: socket.userData.action,
-      });
-      // V2
-      // pack.push([
-      // 	socket.id,
-      // 	socket.userData.model,
-      // 	socket.userData.colour,
-      // 	socket.userData.x,
-      // 	socket.userData.y,
-      // 	socket.userData.z,
-      // 	socket.userData.heading,
-      // 	socket.userData.pb,
-      // 	socket.userData.action
-      // ]);
+    if (!socket.userData.model) {
+      return;
     }
+    pack.push({
+      id: socket.id,
+      model: socket.userData.model,
+      colour: socket.userData.colour,
+      x: socket.userData.x,
+      y: socket.userData.y,
+      z: socket.userData.z,
+      heading: socket.userData.heading,
+      pb: socket.userData.pb,
+      action: socket.userData.action,
+    });
   }
   if (pack.length > 0) io.emit("remoteData", pack);
-}, 40);
+}
+
+setInterval(doUpdate, 40);

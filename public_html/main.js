@@ -188,7 +188,9 @@ console.log("Feel free to interact with `game`");
 // GUI: Camera
 {
   const {gui} = window
-  gui.add( game, 'activeCamera', game.cameras )
+  if(game.cameras) {
+    gui.add( game, 'activeCamera', game.cameras )
+  }
 }
 
 // GUI: Entity Manager
@@ -217,4 +219,12 @@ console.log("Feel free to interact with `game`");
   // Change walk speed
   game.player.state.RUN = 1000;
   game.player.state.TURN = 2;
+}
+
+// NETWORK
+{
+  const {Network} = await import("./src/Network.js")
+  const network = new Network
+
+  window.network = network
 }

@@ -1,4 +1,15 @@
 export class Network {
+  constructor() {
+    const socket = io.connect("http://localhost:2002");
+    // const socket = new FakeSocket()
+
+    socket.onAny(event, message => {
+      console.log(event, message)
+    })
+
+    this.socket = socket
+  }
+
     updateRemotePlayers(dt) {
         if (
           this.remoteData === undefined ||

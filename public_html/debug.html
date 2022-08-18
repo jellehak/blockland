@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Matrix Debugger</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+  </head>
+
+  <body>
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+        }
+      }
+    </script>
+
+    <div id="app">{{ events }}</div>
+
+    <script type="module">
+      import { createApp } from "vue";
+
+      createApp({
+        data() {
+          return {
+            message: "Hello Vue!",
+            events: [],
+          };
+        },
+        async created() {
+          // NETWORK
+          {
+            const { Network } = await import("./src/Network.js");
+            const network = new Network();
+
+            window.network = network;
+
+            const {socket} = network
+            
+            socket.on("connect_error", (err) => {
+              // curl "https://localhost:2002/socket.io/?EIO=4&transport=polling"
+              console.log(`connect_error due to ${err.message}`);
+            });
+
+            // socket.onAny((event, message) => {
+            //   console.log(event, message);
+            //   this.events.push(event, message);
+            // });
+          }
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>
