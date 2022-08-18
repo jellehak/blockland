@@ -1,54 +1,9 @@
-// import { FBXLoader } from 'https://unpkg.com/three@0.92.0/examples/jsm/loaders/FBXLoader.js'
-// import { FBXLoader } from './node_modules/three/examples/jsm/loaders/FBXLoader.js'
-// import * as THREE from 'three'
-import { Preloader, JoyStick, SFX } from "./libs/toon3d.esm.js";
+// @ts-nocheck
+import { JoyStick, SFX } from "./libs/toon3d.esm.js";
 import { Player, PlayerLocal } from "./Player.js";
-// import "./libs/inflate.min.js"
-import "./libs/FBXLoader.js";
-
-// import { GLTFLoader, FBXLoader } from "./three.js";
-// import { THREE } from "./three.js";
-const { THREE } = window;
-const { FBXLoader } = THREE;
-export class ModelLoader {
-  async load(url = "") {
-    const container = new THREE.Object3D();
-    container.name = "player";
-    // scene.add(container);
-
-    const gltf = await new GLTFLoader().loadAsync(url);
-    const model = gltf.scene;
-    model.name = "model";
-    model.traverse(function (object) {
-      // if (object.isMesh)
-      object.castShadow = true;
-    });
-    container.add(model);
-    // scene.add(model);
-
-    // Helper
-    // const { THREE, scene } = ctx;
-    {
-      const box = new THREE.BoxHelper(model, 0xffff00);
-      container.add(box);
-    }
-
-    // NOTE raypicking with glb files
-    // https://stackoverflow.com/questions/15492857/any-way-to-get-a-bounding-box-from-a-three-js-object3d
-    // geometry.computeBoundingBox();  // otherwise geometry.boundingBox will be undefined
-    // Nice example https://codepen.io/Ip3ly5/project/editor/ZLRQNr#0
-
-    // Add animation object
-    // Usage:
-    // last.actions['Idle'].play()
-    const mixer = new THREE.AnimationMixer(model);
-    const actions = {};
-    gltf.animations.forEach((a) => {
-      actions[a.name] = mixer.clipAction(a);
-    });
-    gltf.actions = actions;
-  }
-}
+import { ModelLoader } from "./ModelLoader.js";
+import { THREE } from "./three.js";
+import { GLTFLoader, FBXLoader } from "./three.js";
 class SceneProxy {
   constructor(scene) {
     this.stack = [];
@@ -95,6 +50,15 @@ export class Keyboard {
   }
 }
 
+const ANIMS = [
+  "Walking",
+  "Walking Backwards",
+  "Turn",
+  "Running",
+  "Pointing",
+  "Talking",
+  "Pointing Gesture",
+];
 export class Game {
   constructor() {
     const game = this;
@@ -120,6 +84,8 @@ export class Game {
     this.animations = {};
     this.assetsPath = "assets/";
 
+    this.entities = {}
+
     this.modelLoader = new ModelLoader();
     this.remotePlayers = [];
     this.remoteColliders = [];
@@ -137,30 +103,7 @@ export class Game {
 
     const sfxExt = SFX.supportsAudioType("mp3") ? "mp3" : "ogg";
 
-    this.anims = [
-      "Walking",
-      "Walking Backwards",
-      "Turn",
-      "Running",
-      "Pointing",
-      "Talking",
-      "Pointing Gesture",
-    ];
-
-    const options = {
-      assets: [
-        `${this.assetsPath}images/nx.jpg`,
-        `${this.assetsPath}images/px.jpg`,
-        `${this.assetsPath}images/ny.jpg`,
-        `${this.assetsPath}images/py.jpg`,
-        `${this.assetsPath}images/nz.jpg`,
-        `${this.assetsPath}images/pz.jpg`,
-      ],
-      oncomplete: function () {
-        // game.init();
-      },
-    };
-
+    this.anims = ANIMS;
 
     this.clock = new THREE.Clock();
 
@@ -270,6 +213,17 @@ export class Game {
     // game.animate();
   }
 
+  persist() {
+    localStorage.setItem('graph', JSON.stringify(this.entities))
+  }
+
+  // Sugar
+  async load(...args) {
+    const object = await this.modelLoader.load(...args)
+    this.scene.add(object)
+    return object
+  }
+
   play() {
     this.playing = true;
     this.animate();
@@ -284,12 +238,11 @@ export class Game {
 
     requestAnimationFrame(() => {
       // console.time('animate')
-      if(this.playing) {
+      if (this.playing) {
         game.animate();
         // this.renderer.render(this.scene, this.camera);
       }
       // console.timeEnd('animate')
-
     });
 
     this.updateRemotePlayers(dt);
@@ -330,8 +283,7 @@ export class Game {
       this.sun.position.y += 10;
     }
 
-    if (this.speechBubble)
-      this.speechBubble.show(this.camera.position);
+    if (this.speechBubble) this.speechBubble.show(this.camera.position);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -374,61 +326,26 @@ export class Game {
     // this.init()
   }
 
-  loadEnvironment(uri = "fbx/town.fbx") {
+  loadAssets(urls = []) {
+    return Promise.all(urls.map(url => this.loadAsset(url)))
+  }
+
+  loadAsset(url = [], key = "") {
     const loader = new FBXLoader();
 
     const game = this;
     return new Promise((resolve, reject) => {
-      const url = `${this.assetsPath}${uri}`;
-      loader.load(url, (object) => {
-        game.environment = object;
-        game.colliders = [];
-        object.name = url;
-        game.add(object);
-        object.traverse(function (child) {
-          if (child.isMesh) {
-            if (child.name.startsWith("proxy")) {
-              game.colliders.push(child);
-              child.material.visible = false;
-            } else {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-          }
-        });
-
-        const tloader = new THREE.CubeTextureLoader();
-        tloader.setPath(`${game.assetsPath}/images/`);
-        var textureCube = tloader.load([
-          "px.jpg",
-          "nx.jpg",
-          "py.jpg",
-          "ny.jpg",
-          "pz.jpg",
-          "nz.jpg",
-        ]);
-        game.scene.background = textureCube;
-
+      loader.load(`${url}`, function (object) {
+        game.player.animations[key] = object.animations[0];
+        // if (game.anims.length > 0) {
+        //   game.loadNextAnim();
+        // } else {
+        //   delete game.anims;
+        //   game.action = "Idle";
+        //   game.mode = game.modes.ACTIVE;
+        // }
         resolve(object);
       });
-    });
-  }
-
-  loadNextAnim() {
-    const loader = new FBXLoader();
-
-    let anim = this.anims.pop();
-    const game = this;
-    loader.load(`${this.assetsPath}fbx/anims/${anim}.fbx`, function (object) {
-      game.player.animations[anim] = object.animations[0];
-      if (game.anims.length > 0) {
-        game.loadNextAnim();
-      } else {
-        delete game.anims;
-        game.action = "Idle";
-        game.mode = game.modes.ACTIVE;
-        // game.animate();
-      }
     });
   }
 
@@ -484,6 +401,7 @@ export class Game {
     const collect = new THREE.Object3D();
     collect.position.set(40, 82, 94);
     collect.parent = this.player.object;
+    
     this.cameras = { front, back, wide, overhead, collect, chat };
     this.activeCamera = this.cameras.back;
   }
@@ -517,10 +435,10 @@ export class Game {
 
   updateRemotePlayers(dt) {
     if (
-      this.remoteData === undefined ||
+      !this.remoteData ||
       this.remoteData.length == 0 ||
-      this.player === undefined ||
-      this.player.id === undefined
+      !this.player ||
+      !this.player.id
     )
       return;
 
@@ -538,12 +456,12 @@ export class Game {
           if (player.id == data.id) iplayer = player;
         });
         //If not being initialised check the remotePlayers array
-        if (iplayer === undefined) {
+        if (!iplayer) {
           let rplayer;
           game.remotePlayers.forEach(function (player) {
             if (player.id == data.id) rplayer = player;
           });
-          if (rplayer === undefined) {
+          if (!rplayer) {
             //Initialise player
             game.initialisingPlayers.push(new Player(game, data));
           } else {
@@ -573,10 +491,10 @@ export class Game {
 
   onMouseDown(event) {
     if (
-      this.remoteColliders === undefined ||
+      !this.remoteColliders ||
       this.remoteColliders.length == 0 ||
-      this.speechBubble === undefined ||
-      this.speechBubble.mesh === undefined
+      !this.speechBubble ||
+      !this.speechBubble.mesh
     )
       return;
 
@@ -635,7 +553,7 @@ export class Game {
   }
 
   getRemotePlayerById(id) {
-    if (this.remotePlayers === undefined || this.remotePlayers.length == 0)
+    if (!this.remotePlayers || this.remotePlayers.length == 0)
       return;
 
     const players = this.remotePlayers.filter(function (player) {

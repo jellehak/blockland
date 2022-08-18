@@ -71,8 +71,9 @@ export class Player {
       );
 
       player.object = new THREE.Object3D();
-      player.object.position.set(3122, 0, -173);
-      player.object.rotation.set(0, 2.6, 0);
+      
+      // player.object.position.set(3122, 0, -173);
+      // player.object.rotation.set(0, 2.6, 0);
 
       player.object.add(object);
       if (player.deleted === undefined) game.scene.add(player.object);
@@ -81,7 +82,7 @@ export class Player {
         game.createCameras();
         game.sun.target = game.player.object;
         game.animations.Idle = object.animations[0];
-        if (player.initSocket !== undefined) player.initSocket();
+        if (player.initSocket) player.initSocket();
       } else {
         const geometry = new THREE.BoxGeometry(100, 300, 100);
         const material = new THREE.MeshBasicMaterial({ visible: false });
@@ -99,7 +100,7 @@ export class Player {
         game.remotePlayers.push(players[0]);
       }
 
-      if (game.animations.Idle !== undefined) player.action = "Idle";
+      if (game.animations.Idle) player.action = "Idle";
     });
   }
 
@@ -165,8 +166,8 @@ export class PlayerLocal extends Player {
     };
 
     const player = this;
-    // const socket = io.connect();
-    const socket = new FakeSocket()
+    const socket = io.connect("http://localhost:2002");
+    // const socket = new FakeSocket()
 
     socket.on("setId", (data) => {
       player.id = data.id;
@@ -259,7 +260,7 @@ export class PlayerLocal extends Player {
     let blocked = false;
     const colliders = this.game.colliders;
 
-    if (colliders !== undefined) {
+    if (colliders) {
       const intersect = raycaster.intersectObjects(colliders);
       if (intersect.length > 0) {
         if (intersect[0].distance < 50) blocked = true;
@@ -276,7 +277,7 @@ export class PlayerLocal extends Player {
       }
     }
 
-    if (colliders !== undefined) {
+    if (colliders) {
       //cast left
       dir.set(-1, 0, 0);
       dir.applyMatrix4(this.object.matrix);

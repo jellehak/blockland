@@ -91,10 +91,121 @@ console.log("Feel free to interact with `game`");
 }
 
 // MOD: Teleport
+{
+  //TODO
+}
+
+// Basic scene viewer
+{
+  const { GUI } = await import(
+    "https://cdn.jsdelivr.net/npm/lil-gui@0.17/+esm"
+  );
+
+  const gui = new GUI();
+  window.gui = gui;
+
+  const sceneFolder = gui.addFolder(`Scene`).open(false);
+
+  const methods = {
+    scan() {
+      // Cleanup
+      // gui.folders[1].destroy();
+      sceneFolder.children.map(child => child.destroy())
+      sceneFolder.folders.map(child => child.destroy())
+      scan(game.scene.children, sceneFolder);
+    },
+  };
+
+  const folder = gui.addFolder("game");
+  // .open(false);
+  // folder.add(game, "loadEnvironment");
+  folder.add(game, "play");
+  folder.add(game, "stop");
+  folder.add(methods, "scan");
+
+  // const sceneFolder = gui.addFolder(`Scene (${children.length})`).open(false);
+  scan(game.scene.children, sceneFolder);
+
+  // Scene
+  function scan(children = [], sceneFolder) {
+    children.map((node) => {
+      const nodeFolder = sceneFolder
+        .addFolder(node.name || node.type || node.id)
+        .open(false);
+
+      const obj = {
+        select() {
+          console.log(node);
+          window.current = node;
+          // node.removeFromParent();
+        },
+        open() {
+          scan(node.children, nodeFolder)
+          // node.removeFromParent();
+        },
+      };
+
+      nodeFolder.add(node, "type");
+      nodeFolder.add(node, "visible");
+      {
+        const folder = nodeFolder.addFolder("Position");
+        folder.add(node.position, "x")
+        folder.add(node.position, "y")
+        folder.add(node.position, "z")
+      }
+      {
+        const folder = nodeFolder.addFolder("Scale");
+        folder.add(node.scale, "x")
+        folder.add(node.scale, "y")
+        folder.add(node.scale, "z")
+      }
+      {
+        const folder = nodeFolder.addFolder("Rotation");
+        folder.add(node.rotation, "_x")
+        folder.add(node.rotation, "_y")
+        folder.add(node.rotation, "_z")
+        folder.add(obj, "select"); // button
+        folder.add(obj, "open"); // button
+      }
+
+    });
+
+    // Sync values
+    setInterval(() => {
+      // sceneFolder.updateDisplay()
+    }, 500)
+  }
+}
+
+// ORIGIN
+{
+  const { scene, THREE } = game;
+  const axesHelper = new THREE.AxesHelper(100);
+  scene.add(axesHelper);
+}
 
 {
-  // game.loadEnvironment();
-  // game.loadNextAnim();
+
+}
+
+// MAIN
+{
+  const promises = [
+    "Walking",
+    "Walking Backwards",
+    "Turn",
+    "Running",
+    "Pointing",
+    "Talking",
+    "Pointing Gesture",
+  ].map((anim) => {
+    return game.loadAsset(`${game.assetsPath}fbx/anims/${anim}.fbx`, anim);
+  });
   game.stats();
-  game.play()
+  game.play();
+  game.mode = game.modes.ACTIVE;
+
+  // Change walk speed
+  game.player.state.RUN = 1000;
+  game.player.state.TURN = 2;
 }
