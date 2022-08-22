@@ -5,6 +5,7 @@ import * as Engine from "./src/game.js";
 const game = new Game();
 window.game = game;
 console.log("Feel free to interact with `game`");
+const { scene, THREE } = game;
 
 // MOD skybox
 {
@@ -19,6 +20,10 @@ console.log("Feel free to interact with `game`");
     "https://unpkg.com/three@0.110.0/examples/jsm/controls/OrbitControls.js"
   );
   const controls = new OrbitControls(camera, renderer.domElement);
+
+  //controls.update() must be called after any manual changes to the camera's transform
+  // camera.position.set( 0, 20, 100 );
+  // controls.update();
 
   function animate() {
     requestAnimationFrame(animate);
@@ -184,6 +189,8 @@ class ZoneManager {
     const { THREE } = game;
     const sections = Array(num || 25).fill(0);
 
+    this.sections = sections;
+
     const WIDTH = 1000;
 
     const scene = new THREE.Object3D();
@@ -208,25 +215,122 @@ class ZoneManager {
   set(index, object) {
     object.position.x = Math.floor(index / 5) * this.WIDTH;
     object.position.z = Math.floor(index % 5) * this.WIDTH;
+    return object;
+  }
+  get(index) {
+    return {
+      x: Math.floor(index / 5) * this.WIDTH,
+      y: 0,
+      z: Math.floor(index % 5) * this.WIDTH,
+    };
   }
 }
 
 // Create World placeholders
 const zoneManager = new ZoneManager();
+window.zoneManager = zoneManager;
 
 // Load world(s)
 {
-  const resp = await game.addAsync(import("./mods/desert/load.js"));
-  // zoneManager.set(1)
-}
-{
-  const resp = await game.addAsync(import("./mods/grass/load.js"));
-  zoneManager.set(3, resp)
+  const grounds = {};
+  const desert = await game.addAsync(import("./mods/desert/load.js"));
+  grounds.desert = desert;
+
+  const grass = await game.addAsync(import("./mods/grass/load.js"));
+  grounds.grass = grass;
+
+  // scene.add( zoneManager.set(0, grounds.desert.clone()) )
+  // scene.add( zoneManager.set(1, grounds.desert.clone()) )
+  // scene.add( zoneManager.set(2, grounds.desert.clone()) )
+
+  const zones = new THREE.Object3D();
+  zones.name = "zones";
+  scene.add(zones);
+
+  const materials = Object.values(grounds);
+  zoneManager.sections.forEach((section, index) => {
+    zones.add(zoneManager.set(index, materials[1].clone()));
+  });
 }
 {
   const resp = await game.load("./mods/nature/FBX/BirchTree_1.fbx");
-  resp.castShadow = true;
+  // resp.castShadow = true;
+  // const tree2 = await game.load("./mods/nature/FBX/BirchTree_2.fbx");
 }
+
+// {
+//   {
+//     const resp = await game.load("./mods/nature/FBX/BirchTree_1.fbx");
+//     // Populate each zone
+//     const zones = new THREE.Object3D();
+//     scene.add(zones);
+//     zoneManager.sections.forEach((section, index) => {
+//       zones.add(zoneManager.set(index, resp.clone()));
+//     });
+//   }
+// }
+
+// {
+//   const randomizeMatrix = (function () {
+//     const position = new THREE.Vector3();
+//     const rotation = new THREE.Euler();
+//     const quaternion = new THREE.Quaternion();
+//     const scale = new THREE.Vector3();
+
+//     return function (matrix) {
+//       position.x = Math.random() * 400 - 200;
+//       position.y = Math.random() * 400 - 200;
+//       position.z = Math.random() * 400 - 200;
+
+//       rotation.x = 2 * Math.PI;
+//       rotation.y = 2 * Math.PI;
+//       rotation.z = 2 * Math.PI;
+//       quaternion.setFromEuler(rotation);
+
+//       scale.x = scale.y = scale.z = 1;
+
+//       matrix.compose(position, quaternion, scale);
+//     };
+//   })();
+
+//   const count = 10;
+
+//   const mesh1 = await game.modelLoader.load("./mods/nature/FBX/BirchTree_1.fbx");
+//   console.log(mesh1)
+
+//   const mesh = mesh1.scene.children[0]
+  
+//   const matrix = new THREE.Matrix4();
+//   const meshI = new THREE.InstancedMesh(mesh.geometry, mesh.material, count);
+//   for (let i = 0; i < count; i++) {
+//     randomizeMatrix(matrix);
+//     meshI.setMatrixAt(i, matrix);
+//   }
+//   scene.add(meshI);
+// }
+
+// // Place random
+// {
+//   const mesh1 = await game.load("./mods/nature/FBX/BirchTree_1.fbx");
+//   mesh1.castShadow = true;
+
+//   const count = 100;
+//   const mesh = new THREE.InstancedMesh(mesh1.geometry, mesh1.material, count);
+//   // mesh.instanceMatrix.setUsage( THREE.DynamicDrawUsage ); // will be updated every frame
+
+//   scene.add(mesh);
+
+//   const dummy = new THREE.Object3D();
+
+//   zoneManager.sections.forEach((section, index) => {
+//     zoneManager.set(index, dummy);
+//     dummy.updateMatrix();
+//     console.log(index, dummy.position, dummy.matrix);
+//     mesh.setMatrixAt(index, dummy.matrix);
+//     // scene.add(mesh);
+//   });
+//   mesh.instanceMatrix.needsUpdate = true;
+// }
 
 // Load Player
 // {
@@ -236,5 +340,5 @@ const zoneManager = new ZoneManager();
 //   window.last = entity
 //   const c = new PlayerController()
 //   c.attach(entity)
-//   game.scene.add(entity.scene)
+//   scene.add(entity.scene)
 // }

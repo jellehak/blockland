@@ -66,6 +66,7 @@ export class FollowCamera {
       return
     }
 
+    console.log('lerp cam')
     this.camera.position.lerp(
       this.cameras.active.getWorldPosition(new THREE.Vector3()),
       0.05

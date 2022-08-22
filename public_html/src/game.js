@@ -89,6 +89,12 @@ const ANIMS = [
   "Pointing Gesture",
 ];
 export class Game {
+  resetCamera() {
+    this.camera.position.z = 50;
+    this.camera.position.y = 50;
+    this.camera.lookAt(0, 0, 0);
+  }
+
   constructor() {
     const game = this;
 
@@ -114,6 +120,7 @@ export class Game {
       this.socket = socket;
     }
     this.entities = {};
+    this.materials = {};
     this.rafs = [];
     this.player = null;
     this.remotePlayers = [];
@@ -130,10 +137,12 @@ export class Game {
     );
 
     // Set default cam pointing to origin
-    this.camera.position.z = 50;
-    this.camera.position.y = 50;
+    {
+      this.camera.position.z = 50;
+      this.camera.position.y = 50;
+    }
 
-    const { scene } = this
+    const { scene } = this;
 
     scene.background = new THREE.Color(0x00a0f0);
 
@@ -156,8 +165,8 @@ export class Game {
       light.shadow.mapSize.width = 1024;
       light.shadow.mapSize.height = 1024;
 
-      const helper = new THREE.DirectionalLightHelper( light, 5 );
-      scene.add( helper );
+      const helper = new THREE.DirectionalLightHelper(light, 5);
+      scene.add(helper);
 
       this.sun = light;
       scene.add(light);
@@ -223,6 +232,24 @@ export class Game {
     //   game: this,
     // });
     this.cameraController = new FollowCamera(this);
+  }
+
+  clean() {
+    const { scene } = this;
+
+    const meshes = [];
+
+    scene.traverse(function (object) {
+      if (object.isMesh) meshes.push(object);
+    });
+
+    for (let i = 0; i < meshes.length; i++) {
+      const mesh = meshes[i];
+      mesh.material.dispose();
+      mesh.geometry.dispose();
+
+      scene.remove(mesh);
+    }
   }
 
   get stackWithMatrix() {
@@ -297,15 +324,15 @@ export class Game {
     const response = await promise;
     // Assume default export method
     const resp = response.default(game);
-    return resp
+    return resp;
   }
-  
+
   async loadAsync(promise) {
     // const container = new THREE.Object3D()
     const response = await promise;
     // Assume default export method
     const resp = response.default(game);
-    return resp
+    return resp;
   }
 
   add(what) {
