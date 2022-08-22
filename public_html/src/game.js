@@ -5,6 +5,7 @@ import { ModelLoader } from "./ModelLoader.js";
 import { THREE } from "./three.js";
 import { GLTFLoader, FBXLoader } from "./three.js";
 import { FollowCamera } from "./FollowCamera.js";
+import { Storage } from "./Storage.js";
 
 class SceneProxy {
   constructor(scene) {
@@ -100,6 +101,8 @@ export class Game {
     });
     this.mode = this.modes.NONE;
 
+    this.storage = new Storage(this);
+
     this.THREE = THREE;
     this.container;
     this.cameras;
@@ -111,7 +114,6 @@ export class Game {
     this.animations = {};
     this.assetsPath = "assets/";
     this.modelLoader = new ModelLoader();
-
     // Network
     {
       const socket = io({
@@ -120,10 +122,9 @@ export class Game {
       // socket.connect();
       this.socket = socket;
     }
-
-    // Entities
     this.entities = {};
-    this.player = {};
+    this.rafs = [];
+    this.player = null;
     this.remotePlayers = [];
     this.remoteColliders = [];
     this.initialisingPlayers = [];
@@ -212,8 +213,12 @@ export class Game {
     window.addEventListener("mousemove", onMouseMove, false);
     window.addEventListener("resize", () => this.onWindowResize(), false);
 
-    // Load scene
-    this.player = new PlayerLocal(this);
+    // Example load...
+    {
+      const player = new PlayerLocal(this);
+      this.player = player;
+      this.entities.player = player;
+    }
 
     // this.joystick = new JoyStick({
     //   onMove: this.playerControl,
@@ -222,19 +227,20 @@ export class Game {
     this.cameraController = new FollowCamera(this);
   }
 
-  persist() {
-    // localStorage.setItem("graph", JSON.stringify(this.entities));
-    localStorage.setItem("stack", JSON.stringify(this.stack));
-  }
-  restore(verbose = null) {
-    const stackRaw = localStorage.getItem("stack");
-    const stack = JSON.parse(stackRaw);
-
-    stack.map((mutation) => {
-      if (verbose) {
-        console.log("Running", mutation);
+  get stackWithMatrix() {
+    return this.stack.map((stack) => {
+      const object = this.scene.getObjectById(stack.id);
+      if (!object) {
+        throw new Error(`Could not resolve object with ${stack.id}`);
       }
-      game[mutation.method](...mutation.args);
+      return {
+        ...stack,
+        // Root Object Mutations
+        position: object.position,
+        scale: object.scale,
+        rotation: object.rotation,
+        userData: object.userData,
+      };
     });
   }
 
@@ -244,26 +250,55 @@ export class Game {
    * @returns
    */
   async load(...args) {
-    const object = await this.modelLoader.load(...args);
+    const entity = await this.modelLoader.load(...args);
+
+    const object = entity.scene;
     const getFilename = (url) => url.substring(url.lastIndexOf("/") + 1);
     object.name = getFilename(args[0]);
     this.add(object);
 
+    // Mixer ?
+    if(entity.mixer) {
+      // Play first animation?
+      entity.clips[0].play()
+      this.rafs.push((dt) => {
+        entity.mixer.update(dt)
+      })
+    }
+
     // Replay
-    // game[game.stack[0].method](...game.stack[0].args)
     this.stack.push({
       method: "load",
-      fn: this.load,
       args,
       createdAt: new Date(),
+      // resolved: true,
+      id: object.id,
     });
+
+    // Bind entity info
+    object.entity = entity;
+
+    // Mixin specials
+    // object.addScript = (script = ()=>{}) => {
+    //   script(this)
+    // }
 
     return object;
   }
 
   async addAsync(promise) {
     const response = await promise;
+    // Assume default export method
     response.default(game);
+
+    //  // Replay
+    //  this.stack.push({
+    //   method: "addAsync",
+    //   args,
+    //   createdAt: new Date(),
+    //   // resolved: true,
+    //   id: object.id,
+    // });
   }
 
   add(what) {
@@ -306,9 +341,13 @@ export class Game {
     this.playing = false;
   }
 
+  onUpdate(cb) {
+    this.rafs.push(cb)
+  }
+
   animate() {
     const game = this;
-    const dt = this.clock.getDelta();
+    const dt = this.clock.getDelta();  // seconds
 
     // Keep looping
     requestAnimationFrame(() => {
@@ -316,52 +355,53 @@ export class Game {
       if (this.playing) {
         try {
           game.animate();
-        } catch(err) {
-          this.stop()
-          throw new Error(err)
+        } catch (err) {
+          this.stop();
+          throw new Error(err);
         }
       }
       // console.timeEnd('animate')
     });
 
-    this.updateRemotePlayers(dt);
+    // Play all rafs
+    this.rafs.forEach(raf => {
+      raf(dt)
+    })
+    // userData Script runner
+    // const hasScripts = game.scene.children.filter(e => e.userData.scripts)
+    game.scene.children.forEach(function (object) {
+      if (
+        object.userData.script
+      ) {
+        // object.userData.script(game)
+      }
+    });
 
-    this.player.step(dt);
+    game.updateRemotePlayers(dt);
 
-    // Third person follow camera
-    // const CAMERA_DISTANCE = 300;
-    // if (
-    //   this.cameras &&
-    //   this.cameras.active &&
-    //   this.player &&
-    //   this.player.object
-    // ) {
-    //   this.camera.position.lerp(
-    //     this.cameras.active.getWorldPosition(new THREE.Vector3()),
-    //     0.05
-    //   );
-    //   const pos = this.player.object.position.clone();
-    //   pos.y += CAMERA_DISTANCE;
-    //   this.camera.lookAt(pos);
-    // }
-    this.cameraController.update(dt)
-
-    if (this.sun) {
-      this.sun.position.copy(this.camera.position);
-      this.sun.position.y += 10;
+    if(game.player) {
+      game.player.step(dt);
     }
 
-    this.renderer.render(this.scene, this.camera);
+    // Third person follow camera
+    game.cameraController.update(dt);
+
+    if (game.sun) {
+      game.sun.position.copy(game.camera.position);
+      game.sun.position.y += 10;
+    }
+
+    game.renderer.render(game.scene, game.camera);
   }
 
   disableFollowCamera() {
-    game.cameras.active = null;
+    game.cameraController.active = null;
   }
-  set activeCamera(object) {
-    this.cameras.active = object;
+  set activeCamera(object = null) {
+    this.cameraController.active = object;
   }
   get activeCamera() {
-    return this.cameras.active;
+    return this.cameraController.active;
   }
 
   playerControl(forward = 0, turn = 0) {
@@ -467,6 +507,7 @@ export class Game {
       }
     });
 
+    // Loop scene
     this.scene.children.forEach(function (object) {
       if (
         object.userData.remotePlayer &&

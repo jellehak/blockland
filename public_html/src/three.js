@@ -12,3 +12,4 @@ export * as THREE from "https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.m
 
 export { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.140.0/examples/jsm/loaders/GLTFLoader.js";
 export { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three@0.140.0/examples/jsm/loaders/FBXLoader.js'
+export { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.140.0/examples/jsm/exporters/GLTFExporter.js';

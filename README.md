@@ -26,7 +26,7 @@ game.activeCamera = game.cameras.overhead
 game.activeCamera = game.cameras.wide
 
 // Disable follow cam
-game.cameras.active = null
+game.activeCamera = null
 
 // #########
 // # Walk player
@@ -47,8 +47,8 @@ game.player.root.scale.setScalar(0.1)
 await game.load("https://tracks-earth.github.io/airplanes/models/707.glb")
 
 // # Mods
-import("./mods/skybox/load.js").then(ns=>ns.default(game))
-import("./mods/desert/load.js").then(ns=>ns.default(game))
+// import("./mods/skybox/load.js").then(ns=>ns.default(game))
+// import("./mods/desert/load.js").then(ns=>ns.default(game))
 game.addAsync(import("./mods/desert/load.js"))
 await game.load("mods/models/Soldier.glb")
 

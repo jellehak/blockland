@@ -42,6 +42,7 @@ export class Player {
 
     const container = new THREE.Object3D();
     container.name = "Player"
+    container.scale.setScalar(0.1)
     this.object = container
 
     const loader = new FBXLoader();
