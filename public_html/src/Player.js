@@ -209,14 +209,7 @@ export class PlayerLocal extends Player {
       }
     });
 
-    socket.on("chat message", (data) => {
-      document.getElementById("chat").style.bottom = "0px";
-      const player = game.getRemotePlayerById(data.id);
-      game.speechBubble.player = player;
-      game.chatSocketId = player.id;
-      game.activeCamera = game.cameras.chat;
-      game.speechBubble.update(data.message);
-    });
+    
 
     // Chat
     const msgForm = document.getElementById("msg-form");

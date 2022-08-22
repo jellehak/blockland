@@ -4,7 +4,6 @@ import { Player, PlayerLocal } from "./Player.js";
 import { ModelLoader } from "./ModelLoader.js";
 import { THREE } from "./three.js";
 import { GLTFLoader, FBXLoader } from "./three.js";
-import { SpeechBubble } from "./SpeechBubble.js";
 class SceneProxy {
   constructor(scene) {
     this.stack = [];
@@ -145,12 +144,6 @@ export class Game {
     document.body.appendChild(this.container);
     this.container.appendChild(this.renderer.domElement);
 
-    window.addEventListener(
-      "ontouchstart" in window ? "touchdown" : "mousedown",
-      (event) => this.onMouseDown(event),
-      false
-    );
-
     // Set pointer for clickable objects
     window.addEventListener(
       "mousemove",
@@ -196,8 +189,7 @@ export class Game {
     // Load scene
     this.player = new PlayerLocal(this);
 
-    this.speechBubble = new SpeechBubble(this, "", 150);
-    this.speechBubble.mesh.position.set(0, 350, 0);
+
 
     this.joystick = new JoyStick({
       onMove: this.playerControl,
@@ -480,69 +472,6 @@ export class Game {
     this.remotePlayers.forEach(function (player) {
       player.update(dt);
     });
-  }
-
-  onMouseDown(event) {
-    if (
-      !this.remoteColliders ||
-      this.remoteColliders.length == 0 ||
-      !this.speechBubble ||
-      !this.speechBubble.mesh
-    )
-      return;
-
-    const chat = document.getElementById("chat");
-
-    // calculate mouse position in normalized device coordinates
-    // (-1 to +1) for both components
-    const mouse = new THREE.Vector2();
-    mouse.x = (event.clientX / this.renderer.domElement.clientWidth) * 2 - 1;
-    mouse.y = -(event.clientY / this.renderer.domElement.clientHeight) * 2 + 1;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, this.camera);
-
-    const intersects = raycaster.intersectObjects(this.remoteColliders);
-
-    if (intersects.length > 0) {
-      const object = intersects[0].object;
-      const players = this.remotePlayers.filter(function (player) {
-        if (player.collider && player.collider == object) {
-          return true;
-        }
-      });
-
-      // document.body.style.cursor = "inherit";
-
-      if (players.length > 0) {
-        const player = players[0];
-
-        // document.body.style.cursor = "pointer";
-        console.log(`onMouseDown: player ${player.id}`);
-        this.speechBubble.player = player;
-        this.speechBubble.update("");
-        this.scene.add(this.speechBubble.mesh);
-        this.chatSocketId = player.id;
-        chat.style.bottom = "0px";
-        this.activeCamera = this.cameras.chat;
-      }
-    } else {
-      //Is the chat panel visible?
-      if (
-        chat.style.bottom == "0px" &&
-        window.innerHeight - event.clientY > 40
-      ) {
-        console.log("onMouseDown: No player found");
-        if (this.speechBubble.mesh.parent !== null)
-          this.speechBubble.mesh.parent.remove(this.speechBubble.mesh);
-        delete this.speechBubble.player;
-        delete this.chatSocketId;
-        chat.style.bottom = "-50px";
-        this.activeCamera = this.cameras.back;
-      } else {
-        console.log("onMouseDown: typing");
-      }
-    }
   }
 
   getRemotePlayerById(id) {
