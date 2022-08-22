@@ -6,6 +6,7 @@ import { THREE } from "./three.js";
 import { GLTFLoader, FBXLoader } from "./three.js";
 import { FollowCamera } from "./FollowCamera.js";
 import { Storage } from "./Storage.js";
+export * from "./PlayerController.js";
 
 class SceneProxy {
   constructor(scene) {
@@ -91,16 +92,6 @@ export class Game {
   constructor() {
     const game = this;
 
-    this.modes = Object.freeze({
-      NONE: Symbol("none"),
-      PRELOAD: Symbol("preload"),
-      INITIALISING: Symbol("initialising"),
-      CREATING_LEVEL: Symbol("creating_level"),
-      ACTIVE: Symbol("active"),
-      GAMEOVER: Symbol("gameover"),
-    });
-    this.mode = this.modes.NONE;
-
     this.storage = new Storage(this);
 
     this.THREE = THREE;
@@ -131,18 +122,23 @@ export class Game {
     this.remoteData = [];
     this.anims = ANIMS;
     this.clock = new THREE.Clock();
-    this.mode = this.modes.INITIALISING;
     this.camera = new THREE.PerspectiveCamera(
       45,
       window.innerWidth / window.innerHeight,
       10,
-      200000
+      20000
     );
 
-    this.scene.background = new THREE.Color(0x00a0f0);
+    // Set default cam pointing to origin
+    this.camera.position.z = 50;
+    this.camera.position.y = 50;
+
+    const { scene } = this
+
+    scene.background = new THREE.Color(0x00a0f0);
 
     const ambient = new THREE.AmbientLight(0xaaaaaa);
-    this.scene.add(ambient);
+    scene.add(ambient);
 
     {
       const light = new THREE.DirectionalLight(0xaaaaaa);
@@ -153,16 +149,18 @@ export class Game {
 
       const lightSize = 500;
       light.shadow.camera.near = 1;
-      light.shadow.camera.far = 500;
+      light.shadow.camera.far = 50000;
       light.shadow.camera.left = light.shadow.camera.bottom = -lightSize;
       light.shadow.camera.right = light.shadow.camera.top = lightSize;
-
       light.shadow.bias = 0.0039;
       light.shadow.mapSize.width = 1024;
       light.shadow.mapSize.height = 1024;
 
+      const helper = new THREE.DirectionalLightHelper( light, 5 );
+      scene.add( helper );
+
       this.sun = light;
-      this.scene.add(light);
+      scene.add(light);
     }
 
     {
@@ -214,11 +212,11 @@ export class Game {
     window.addEventListener("resize", () => this.onWindowResize(), false);
 
     // Example load...
-    {
-      const player = new PlayerLocal(this);
-      this.player = player;
-      this.entities.player = player;
-    }
+    // {
+    //   const player = new PlayerLocal(this);
+    //   this.player = player;
+    //   this.entities.player = player;
+    // }
 
     // this.joystick = new JoyStick({
     //   onMove: this.playerControl,
@@ -252,18 +250,21 @@ export class Game {
   async load(...args) {
     const entity = await this.modelLoader.load(...args);
 
+    // add to scene
     const object = entity.scene;
-    const getFilename = (url) => url.substring(url.lastIndexOf("/") + 1);
-    object.name = getFilename(args[0]);
     this.add(object);
 
+    // Set Name
+    const getFilename = (url) => url.substring(url.lastIndexOf("/") + 1);
+    object.name = getFilename(args[0]);
+
     // Mixer ?
-    if(entity.mixer) {
+    if (entity.mixer) {
       // Play first animation?
-      entity.clips[0].play()
+      entity.clips[0].play();
       this.rafs.push((dt) => {
-        entity.mixer.update(dt)
-      })
+        entity.mixer.update(dt);
+      });
     }
 
     // Replay
@@ -286,19 +287,25 @@ export class Game {
     return object;
   }
 
+  select(what) {
+    const { THREE, scene } = game;
+    const box = new THREE.BoxHelper(what, 0xffff00);
+    what.add(box);
+  }
+
   async addAsync(promise) {
     const response = await promise;
     // Assume default export method
-    response.default(game);
-
-    //  // Replay
-    //  this.stack.push({
-    //   method: "addAsync",
-    //   args,
-    //   createdAt: new Date(),
-    //   // resolved: true,
-    //   id: object.id,
-    // });
+    const resp = response.default(game);
+    return resp
+  }
+  
+  async loadAsync(promise) {
+    // const container = new THREE.Object3D()
+    const response = await promise;
+    // Assume default export method
+    const resp = response.default(game);
+    return resp
   }
 
   add(what) {
@@ -317,17 +324,17 @@ export class Game {
     // this.init()
   }
 
-  loadAssets(urls = []) {
-    return Promise.all(urls.map((url) => this.loadAsset(url)));
-  }
+  // loadAssets(urls = []) {
+  //   return Promise.all(urls.map((url) => this.loadAsset(url)));
+  // }
 
-  loadAsset(url = [], key = "") {
+  loadAsset(url = [], key = "", parent = null) {
     const loader = new FBXLoader();
 
-    const game = this;
     return new Promise((resolve, reject) => {
       loader.load(`${url}`, function (object) {
-        game.player.animations[key] = object.animations[0];
+        // game.player.animations[key] = object.animations[0];
+        parent.animations[key] = object.animations[0];
         resolve(object);
       });
     });
@@ -342,12 +349,12 @@ export class Game {
   }
 
   onUpdate(cb) {
-    this.rafs.push(cb)
+    this.rafs.push(cb);
   }
 
   animate() {
     const game = this;
-    const dt = this.clock.getDelta();  // seconds
+    const dt = this.clock.getDelta(); // seconds
 
     // Keep looping
     requestAnimationFrame(() => {
@@ -364,32 +371,30 @@ export class Game {
     });
 
     // Play all rafs
-    this.rafs.forEach(raf => {
-      raf(dt)
-    })
+    this.rafs.forEach((raf) => {
+      raf(dt);
+    });
     // userData Script runner
     // const hasScripts = game.scene.children.filter(e => e.userData.scripts)
-    game.scene.children.forEach(function (object) {
-      if (
-        object.userData.script
-      ) {
-        // object.userData.script(game)
-      }
-    });
+    // game.scene.children.forEach(function (object) {
+    //   if (object.userData.script) {
+    //     // object.userData.script(game)
+    //   }
+    // });
 
     game.updateRemotePlayers(dt);
 
-    if(game.player) {
+    if (game.player) {
       game.player.step(dt);
     }
 
     // Third person follow camera
     game.cameraController.update(dt);
 
-    if (game.sun) {
-      game.sun.position.copy(game.camera.position);
-      game.sun.position.y += 10;
-    }
+    // if (game.sun) {
+    //   game.sun.position.copy(game.camera.position);
+    //   game.sun.position.y += 10;
+    // }
 
     game.renderer.render(game.scene, game.camera);
   }
