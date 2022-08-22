@@ -29,6 +29,13 @@
           >https://admin.socket.io/#/events</a
         >
       </div>
+
+      <h2>State</h2>
+      <div style="height: 400px; overflow: auto; overflow-y: scroll;">
+        <pre>{{ remoteData }}</pre>
+      </div>
+
+      <h2>Events</h2>
       <div style="height: 400px; overflow: auto; overflow-y: scroll;">
         <!-- <pre>{{ events }}</pre> -->
         <div v-for="event in events">
@@ -45,6 +52,7 @@
           return {
             message: "Hello Vue!",
             events: [],
+            remoteData: null,
             player: {
               model: "Housewife",
               colour: "Black",
@@ -82,19 +90,19 @@
               console.log(`connect_error due to ${err.message}`);
             });
 
+            // Debug
             socket.onAny((event, message) => {
-              console.log(event, message);
+              // console.log(event, message);
               this.events.push({ event, message });
             });
+
+            const game = this
 
             socket.on("setId", (data) => {
               this.id = data.id;
             });
             socket.on("remoteData", (data) => {
-              console.log(data);
-              // game.remoteData = data;
-              // TODO
-
+              game.remoteData = data;
             });
 
             const {player} = this
