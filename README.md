@@ -25,6 +25,10 @@ game.activeCamera = game.cameras.front
 game.activeCamera = game.cameras.overhead
 game.activeCamera = game.cameras.wide
 
+// Disable follow cam
+game.cameras.active = null
+
+// #########
 // # Walk player
 game.playerControl(0.4,0)
 // Stop
@@ -36,18 +40,17 @@ game.player.state
 game.player.state.RUN = 1000
 game.player.state.TURN = 2
 
-// World
-await game.loadEnvironment()
+game.player.root.scale.setScalar(0.1)
 
-// Player
-await game.loadNextAnim()
 
 // Add object
-await game.load("https://tracks-earth.github.io/airplanes/models/paraglider.glb")
+await game.load("https://tracks-earth.github.io/airplanes/models/707.glb")
 
-// Mods
+// # Mods
 import("./mods/skybox/load.js").then(ns=>ns.default(game))
-import("./mods/sand/load.js").then(ns=>ns.default(game))
+import("./mods/desert/load.js").then(ns=>ns.default(game))
+game.addAsync(import("./mods/desert/load.js"))
+await game.load("mods/models/Soldier.glb")
 
 // Add NPC
 

@@ -40,6 +40,10 @@ export class Player {
     this.game = game;
     this.animations = this.game.animations;
 
+    const container = new THREE.Object3D();
+    container.name = "Player"
+    this.object = container
+
     const loader = new FBXLoader();
     const player = this;
 
@@ -69,18 +73,16 @@ export class Player {
           });
         }
       );
+      
+      // container.position.set(3122, 0, -173);
+      // container.rotation.set(0, 2.6, 0);
 
-      player.object = new THREE.Object3D();
-
-      // player.object.position.set(3122, 0, -173);
-      // player.object.rotation.set(0, 2.6, 0);
-
-      player.object.add(object);
-      if (player.deleted === undefined) game.scene.add(player.object);
+      container.add(object);
+      if (player.deleted === undefined) game.scene.add(container);
 
       if (player.local) {
         game.createCameras();
-        game.sun.target = game.player.object;
+        game.sun.target = container;
         game.animations.Idle = object.animations[0];
         if (player.initSocket) player.initSocket();
       } else {
@@ -89,10 +91,10 @@ export class Player {
         const box = new THREE.Mesh(geometry, material);
         box.name = "Collider";
         box.position.set(0, 150, 0);
-        player.object.add(box);
+        container.add(box);
         player.collider = box;
-        player.object.userData.id = player.id;
-        player.object.userData.remotePlayer = true;
+        container.userData.id = player.id;
+        container.userData.remotePlayer = true;
         const players = game.initialisingPlayers.splice(
           game.initialisingPlayers.indexOf(this),
           1
@@ -157,13 +159,13 @@ class FakeSocket {
 
 class InitMessage {
   constructor() {
-      this.model = ""
-      this.colour = ""
-      this.x = 0
-      this.y = 0
-      this.z = 0
-      this.h = 0
-      this.pb = 0
+    this.model = "";
+    this.colour = "";
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.h = 0;
+    this.pb = 0;
   }
 }
 
@@ -209,8 +211,6 @@ export class PlayerLocal extends Player {
       }
     });
 
-    
-
     // Chat
     const msgForm = document.getElementById("msg-form");
     const m = document.getElementById("m");
@@ -226,6 +226,21 @@ export class PlayerLocal extends Player {
     this.socket = socket;
   }
 
+  step(dt) {
+    const player = this;
+
+    if (player.mixer) player.mixer.update(dt);
+
+    if (player.action == "Walking") {
+      const elapsedTime = Date.now() - player.actionTime;
+      if (elapsedTime > 1000 && player.motion.forward > 0) {
+        player.action = "Running";
+      }
+    }
+
+    if (player.motion) player.move(dt);
+  }
+
   initSocket() {
     //console.log("PlayerLocal.initSocket");
     const message = {
@@ -236,9 +251,9 @@ export class PlayerLocal extends Player {
       z: this.object.position.z,
       h: this.object.rotation.y,
       pb: this.object.rotation.x,
-    }
-    window.welcome = message
-    this.socket.emit("init", message );
+    };
+    this.welcome = message;
+    this.socket.emit("init", message);
   }
 
   updateSocket() {

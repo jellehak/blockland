@@ -4,6 +4,8 @@ import { Player, PlayerLocal } from "./Player.js";
 import { ModelLoader } from "./ModelLoader.js";
 import { THREE } from "./three.js";
 import { GLTFLoader, FBXLoader } from "./three.js";
+import { FollowCamera } from "./FollowCamera.js";
+
 class SceneProxy {
   constructor(scene) {
     this.stack = [];
@@ -16,6 +18,31 @@ class SceneProxy {
     this.scene.add(what);
   }
   undo() {}
+}
+
+export function createCameras(game) {
+  const offset = new THREE.Vector3(0, 80, 0);
+  const front = new THREE.Object3D();
+  front.position.set(112, 100, 600);
+  front.parent = game.player.object;
+  const back = new THREE.Object3D();
+  back.position.set(0, 300, -1050);
+  back.parent = game.player.object;
+  const chat = new THREE.Object3D();
+  chat.position.set(0, 200, -450);
+  chat.parent = game.player.object;
+  const wide = new THREE.Object3D();
+  wide.position.set(178, 139, 1665);
+  wide.parent = game.player.object;
+  const overhead = new THREE.Object3D();
+  overhead.position.set(0, 400, 0);
+  overhead.parent = game.player.object;
+  const collect = new THREE.Object3D();
+  collect.position.set(40, 82, 94);
+  collect.parent = game.player.object;
+
+  game.cameras = { front, back, wide, overhead, collect, chat };
+  game.activeCamera = game.cameras.back;
 }
 
 /**
@@ -79,31 +106,31 @@ export class Game {
     this.camera;
     this.scene = new THREE.Scene();
     this.sceneProxy = new SceneProxy(this.scene);
+    this.stack = [];
     this.renderer;
     this.animations = {};
     this.assetsPath = "assets/";
     this.modelLoader = new ModelLoader();
 
+    // Network
+    {
+      const socket = io({
+        autoConnect: false,
+      });
+      // socket.connect();
+      this.socket = socket;
+    }
+
     // Entities
-    this.entities = {}
+    this.entities = {};
     this.player = {};
     this.remotePlayers = [];
     this.remoteColliders = [];
     this.initialisingPlayers = [];
     this.remoteData = [];
-
-    const sfxExt = SFX.supportsAudioType("mp3") ? "mp3" : "ogg";
-
     this.anims = ANIMS;
-
     this.clock = new THREE.Clock();
-
-    window.onError = function (error) {
-      console.error(JSON.stringify(error));
-    };
-
     this.mode = this.modes.INITIALISING;
-
     this.camera = new THREE.PerspectiveCamera(
       45,
       window.innerWidth / window.innerHeight,
@@ -116,189 +143,129 @@ export class Game {
     const ambient = new THREE.AmbientLight(0xaaaaaa);
     this.scene.add(ambient);
 
-    const light = new THREE.DirectionalLight(0xaaaaaa);
-    light.position.set(30, 100, 40);
-    light.target.position.set(0, 0, 0);
+    {
+      const light = new THREE.DirectionalLight(0xaaaaaa);
+      light.position.set(30, 100, 40);
+      light.target.position.set(0, 0, 0);
 
-    light.castShadow = true;
+      light.castShadow = true;
 
-    const lightSize = 500;
-    light.shadow.camera.near = 1;
-    light.shadow.camera.far = 500;
-    light.shadow.camera.left = light.shadow.camera.bottom = -lightSize;
-    light.shadow.camera.right = light.shadow.camera.top = lightSize;
+      const lightSize = 500;
+      light.shadow.camera.near = 1;
+      light.shadow.camera.far = 500;
+      light.shadow.camera.left = light.shadow.camera.bottom = -lightSize;
+      light.shadow.camera.right = light.shadow.camera.top = lightSize;
 
-    light.shadow.bias = 0.0039;
-    light.shadow.mapSize.width = 1024;
-    light.shadow.mapSize.height = 1024;
+      light.shadow.bias = 0.0039;
+      light.shadow.mapSize.width = 1024;
+      light.shadow.mapSize.height = 1024;
 
-    this.sun = light;
-    this.scene.add(light);
+      this.sun = light;
+      this.scene.add(light);
+    }
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.container = document.createElement("div");
-    this.container.style.height = "100%";
-    document.body.appendChild(this.container);
-    this.container.appendChild(this.renderer.domElement);
+    {
+      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+      this.renderer.setPixelRatio(window.devicePixelRatio);
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.shadowMap.enabled = true;
+      this.container = document.createElement("div");
+      this.container.style.height = "100%";
+      document.body.appendChild(this.container);
+      this.container.appendChild(this.renderer.domElement);
+    }
 
     // Set pointer for clickable objects
-    window.addEventListener(
-      "mousemove",
-      (event) => {
-        // calculate mouse position in normalized device coordinates
-        // (-1 to +1) for both components
-        const mouse = new THREE.Vector2();
-        mouse.x =
-          (event.clientX / this.renderer.domElement.clientWidth) * 2 - 1;
-        mouse.y =
-          -(event.clientY / this.renderer.domElement.clientHeight) * 2 + 1;
+    const onMouseMove = (event) => {
+      // calculate mouse position in normalized device coordinates
+      // (-1 to +1) for both components
+      const mouse = new THREE.Vector2();
+      mouse.x = (event.clientX / this.renderer.domElement.clientWidth) * 2 - 1;
+      mouse.y =
+        -(event.clientY / this.renderer.domElement.clientHeight) * 2 + 1;
 
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, this.camera);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, this.camera);
 
-        const intersects = raycaster.intersectObjects(this.remoteColliders);
+      const intersects = raycaster.intersectObjects(this.remoteColliders);
 
-        this.intersects = intersects;
+      this.intersects = intersects;
 
-        if (!intersects.length) {
-          document.body.style.cursor = "inherit";
-        }
+      if (!intersects.length) {
+        document.body.style.cursor = "inherit";
+      }
 
-        if (intersects.length > 0) {
-          const object = intersects[0].object;
-          const players = this.remotePlayers.filter(function (player) {
-            if (player.collider && player.collider == object) {
-              return true;
-            }
-          });
-
-          if (players.length > 0) {
-            const player = players[0];
-            document.body.style.cursor = "pointer";
+      if (intersects.length > 0) {
+        const object = intersects[0].object;
+        const players = this.remotePlayers.filter(function (player) {
+          if (player.collider && player.collider == object) {
+            return true;
           }
-        }
-      },
-      false
-    );
+        });
 
+        if (players.length > 0) {
+          const player = players[0];
+          document.body.style.cursor = "pointer";
+        }
+      }
+    };
+    window.addEventListener("mousemove", onMouseMove, false);
     window.addEventListener("resize", () => this.onWindowResize(), false);
 
     // Load scene
     this.player = new PlayerLocal(this);
 
-
-
-    this.joystick = new JoyStick({
-      onMove: this.playerControl,
-      game: this,
-    });
-    // this.loadEnvironment();
-    // this.loadNextAnim();
-
-    // Start animation
-    // game.animate();
+    // this.joystick = new JoyStick({
+    //   onMove: this.playerControl,
+    //   game: this,
+    // });
+    this.cameraController = new FollowCamera(this);
   }
 
   persist() {
-    localStorage.setItem('graph', JSON.stringify(this.entities))
+    // localStorage.setItem("graph", JSON.stringify(this.entities));
+    localStorage.setItem("stack", JSON.stringify(this.stack));
+  }
+  restore(verbose = null) {
+    const stackRaw = localStorage.getItem("stack");
+    const stack = JSON.parse(stackRaw);
+
+    stack.map((mutation) => {
+      if (verbose) {
+        console.log("Running", mutation);
+      }
+      game[mutation.method](...mutation.args);
+    });
   }
 
-  // Sugar
+  /**
+   * Load a model
+   * @param  {...any} args
+   * @returns
+   */
   async load(...args) {
-    const object = await this.modelLoader.load(...args)
-    this.scene.add(object)
-    return object
-  }
+    const object = await this.modelLoader.load(...args);
+    const getFilename = (url) => url.substring(url.lastIndexOf("/") + 1);
+    object.name = getFilename(args[0]);
+    this.add(object);
 
-  play() {
-    this.playing = true;
-    this.animate();
-  }
-  stop() {
-    this.playing = false;
-  }
-
-  animate() {
-    const game = this;
-    const dt = this.clock.getDelta();
-
-    requestAnimationFrame(() => {
-      // console.time('animate')
-      if (this.playing) {
-        game.animate();
-        // this.renderer.render(this.scene, this.camera);
-      }
-      // console.timeEnd('animate')
+    // Replay
+    // game[game.stack[0].method](...game.stack[0].args)
+    this.stack.push({
+      method: "load",
+      fn: this.load,
+      args,
+      createdAt: new Date(),
     });
 
-    this.updateRemotePlayers(dt);
-
-    if (this.player.mixer && this.mode == this.modes.ACTIVE)
-      this.player.mixer.update(dt);
-
-    if (this.player.action == "Walking") {
-      const elapsedTime = Date.now() - this.player.actionTime;
-      if (elapsedTime > 1000 && this.player.motion.forward > 0) {
-        this.player.action = "Running";
-      }
-    }
-
-    if (this.player.motion) this.player.move(dt);
-
-    if (
-      this.cameras &&
-      this.cameras.active &&
-      this.player &&
-      this.player.object
-    ) {
-      this.camera.position.lerp(
-        this.cameras.active.getWorldPosition(new THREE.Vector3()),
-        0.05
-      );
-      const pos = this.player.object.position.clone();
-      if (this.cameras.active == this.cameras.chat) {
-        pos.y += 200;
-      } else {
-        pos.y += 300;
-      }
-      this.camera.lookAt(pos);
-    }
-
-    if (this.sun) {
-      this.sun.position.copy(this.camera.position);
-      this.sun.position.y += 10;
-    }
-
-    if (this.speechBubble) this.speechBubble.show(this.camera.position);
-
-    this.renderer.render(this.scene, this.camera);
+    return object;
   }
 
-  initSfx() {
-    this.sfx = {};
-    this.sfx.context = new (window.AudioContext || window.webkitAudioContext)();
-    this.sfx.gliss = new SFX({
-      context: this.sfx.context,
-      src: {
-        mp3: `${this.assetsPath}sfx/gliss.mp3`,
-        ogg: `${this.assetsPath}sfx/gliss.ogg`,
-      },
-      loop: false,
-      volume: 0.3,
-    });
+  async addAsync(promise) {
+    const response = await promise;
+    response.default(game);
   }
 
-  set activeCamera(object) {
-    this.cameras.active = object;
-  }
-  get activeCamera() {
-    return this.cameras.active;
-  }
-
-  // Scene proxy
   add(what) {
     this.sceneProxy.add(what);
   }
@@ -316,7 +283,7 @@ export class Game {
   }
 
   loadAssets(urls = []) {
-    return Promise.all(urls.map(url => this.loadAsset(url)))
+    return Promise.all(urls.map((url) => this.loadAsset(url)));
   }
 
   loadAsset(url = [], key = "") {
@@ -329,6 +296,72 @@ export class Game {
         resolve(object);
       });
     });
+  }
+
+  play() {
+    this.playing = true;
+    this.animate();
+  }
+  stop() {
+    this.playing = false;
+  }
+
+  animate() {
+    const game = this;
+    const dt = this.clock.getDelta();
+
+    // Keep looping
+    requestAnimationFrame(() => {
+      // console.time('animate')
+      if (this.playing) {
+        try {
+          game.animate();
+        } catch(err) {
+          this.stop()
+          throw new Error(err)
+        }
+      }
+      // console.timeEnd('animate')
+    });
+
+    this.updateRemotePlayers(dt);
+
+    this.player.step(dt);
+
+    // Third person follow camera
+    // const CAMERA_DISTANCE = 300;
+    // if (
+    //   this.cameras &&
+    //   this.cameras.active &&
+    //   this.player &&
+    //   this.player.object
+    // ) {
+    //   this.camera.position.lerp(
+    //     this.cameras.active.getWorldPosition(new THREE.Vector3()),
+    //     0.05
+    //   );
+    //   const pos = this.player.object.position.clone();
+    //   pos.y += CAMERA_DISTANCE;
+    //   this.camera.lookAt(pos);
+    // }
+    this.cameraController.update(dt)
+
+    if (this.sun) {
+      this.sun.position.copy(this.camera.position);
+      this.sun.position.y += 10;
+    }
+
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  disableFollowCamera() {
+    game.cameras.active = null;
+  }
+  set activeCamera(object) {
+    this.cameras.active = object;
+  }
+  get activeCamera() {
+    return this.cameras.active;
   }
 
   playerControl(forward = 0, turn = 0) {
@@ -363,28 +396,7 @@ export class Game {
   }
 
   createCameras() {
-    const offset = new THREE.Vector3(0, 80, 0);
-    const front = new THREE.Object3D();
-    front.position.set(112, 100, 600);
-    front.parent = this.player.object;
-    const back = new THREE.Object3D();
-    back.position.set(0, 300, -1050);
-    back.parent = this.player.object;
-    const chat = new THREE.Object3D();
-    chat.position.set(0, 200, -450);
-    chat.parent = this.player.object;
-    const wide = new THREE.Object3D();
-    wide.position.set(178, 139, 1665);
-    wide.parent = this.player.object;
-    const overhead = new THREE.Object3D();
-    overhead.position.set(0, 400, 0);
-    overhead.parent = this.player.object;
-    const collect = new THREE.Object3D();
-    collect.position.set(40, 82, 94);
-    collect.parent = this.player.object;
-    
-    this.cameras = { front, back, wide, overhead, collect, chat };
-    this.activeCamera = this.cameras.back;
+    return createCameras(this);
   }
 
   showMessage(msg = "", fontSize = 20, onOK = null) {
@@ -425,47 +437,44 @@ export class Game {
       return;
     }
 
-    const newPlayers = [];
     const game = this;
     //Get all remotePlayers from remoteData array
     const remotePlayers = [];
     const remoteColliders = [];
 
-    this.remoteData
-      .forEach(function (data) {
-        if (game.player.id != data.id) {
-          //Is this player being initialised?
-          let iplayer;
-          game.initialisingPlayers.forEach(function (player) {
-            if (player.id == data.id) iplayer = player;
+    this.remoteData.forEach(function (data) {
+      if (game.player.id != data.id) {
+        //Is this player being initialised?
+        let iplayer;
+        game.initialisingPlayers.forEach(function (player) {
+          if (player.id == data.id) iplayer = player;
+        });
+        //If not being initialised check the remotePlayers array
+        if (!iplayer) {
+          let rplayer;
+          game.remotePlayers.forEach(function (player) {
+            if (player.id == data.id) rplayer = player;
           });
-          //If not being initialised check the remotePlayers array
-          if (!iplayer) {
-            let rplayer;
-            game.remotePlayers.forEach(function (player) {
-              if (player.id == data.id) rplayer = player;
-            });
-            if (!rplayer) {
-              //Initialise player
-              game.initialisingPlayers.push(new Player(game, data));
-            } else {
-              //Player exists
-              remotePlayers.push(rplayer);
-              remoteColliders.push(rplayer.collider);
-            }
+          if (!rplayer) {
+            //Initialise player
+            game.initialisingPlayers.push(new Player(game, data));
+          } else {
+            //Player exists
+            remotePlayers.push(rplayer);
+            remoteColliders.push(rplayer.collider);
           }
         }
-      });
+      }
+    });
 
-    this.scene.children
-      .forEach(function (object) {
-        if (
-          object.userData.remotePlayer &&
-          game.getRemotePlayerById(object.userData.id) == undefined
-        ) {
-          game.scene.remove(object);
-        }
-      });
+    this.scene.children.forEach(function (object) {
+      if (
+        object.userData.remotePlayer &&
+        game.getRemotePlayerById(object.userData.id) == undefined
+      ) {
+        game.scene.remove(object);
+      }
+    });
 
     this.remotePlayers = remotePlayers;
     this.remoteColliders = remoteColliders;
@@ -474,9 +483,8 @@ export class Game {
     });
   }
 
-  getRemotePlayerById(id) {
-    if (!this.remotePlayers || this.remotePlayers.length == 0)
-      return;
+  getRemotePlayerById(id = "") {
+    if (!this.remotePlayers || this.remotePlayers.length == 0) return;
 
     const players = this.remotePlayers.filter(function (player) {
       if (player.id == id) return true;
@@ -487,4 +495,3 @@ export class Game {
     return players[0];
   }
 }
-

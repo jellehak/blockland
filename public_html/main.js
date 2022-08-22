@@ -1,3 +1,4 @@
+import { Object3D } from "three";
 import { Game, Keyboard } from "./src/game.js";
 
 const game = new Game();
@@ -11,22 +12,22 @@ console.log("Feel free to interact with `game`");
 
 // OrbitControl https://threejs.org/docs/#examples/en/controls/OrbitControls
 // import { OrbitControls } from 'https://unpkg.com/three@0.110.0/examples/jsm/controls/OrbitControls.js'
-// {
+{
+  const {camera, renderer} = game
+  const {OrbitControls} = await import ('https://unpkg.com/three@0.110.0/examples/jsm/controls/OrbitControls.js')
+  const controls = new OrbitControls( camera, renderer.domElement );
 
-//   const {camera, renderer} = game
-//   const controls = new OrbitControls( camera, renderer.domElement );
+  function animate() {
 
-//   function animate() {
+    requestAnimationFrame( animate );
 
-//     requestAnimationFrame( animate );
+    // required if controls.enableDamping or controls.autoRotate are set to true
+    controls.update();
 
-//     // required if controls.enableDamping or controls.autoRotate are set to true
-//     controls.update();
-
-//     // renderer.render( scene, camera );
-//   }
-//   animate()
-// }
+    // renderer.render( scene, camera );
+  }
+  animate()
+}
 
 // MOD: Keyboard input
 {
@@ -108,7 +109,7 @@ console.log("Feel free to interact with `game`");
   const sceneFolder = gui.addFolder(`Scene`).open(false);
 
   const methods = {
-    scan() {
+    refresh() {
       // Cleanup
       // gui.folders[1].destroy();
       sceneFolder.children.map(child => child.destroy())
@@ -117,12 +118,13 @@ console.log("Feel free to interact with `game`");
     },
   };
 
+  sceneFolder.add(methods, "refresh");
+
   const folder = gui.addFolder("game");
   // .open(false);
   // folder.add(game, "loadEnvironment");
   folder.add(game, "play");
   folder.add(game, "stop");
-  folder.add(methods, "scan");
 
   // const sceneFolder = gui.addFolder(`Scene (${children.length})`).open(false);
   scan(game.scene.children, sceneFolder);
@@ -189,7 +191,9 @@ console.log("Feel free to interact with `game`");
 {
   const {gui} = window
   if(game.cameras) {
-    gui.add( game, 'activeCamera', game.cameras )
+    const folder = gui.addFolder(`Camera`).open(false);
+    folder.add( game, 'activeCamera', game.cameras )
+    folder.add( game, 'disableFollowCamera' )
   }
 }
 
@@ -197,6 +201,7 @@ console.log("Feel free to interact with `game`");
 {
   const {gui} = window
   // gui.add( game, 'player', game.players )
+  // TODO
 }
 
 // MAIN
@@ -236,4 +241,59 @@ console.log("Feel free to interact with `game`");
   // folder.add(network, "server")
   // folder.add(network, "status")
   // folder.add(network, "id").listen()
+}
+
+// Mod Loader
+{
+  const files = await fetch("mods/files.txt").then(r => r.text()).then(files => files.split("\n"))
+  console.log(files)
+  const methods = {
+    play(what) {
+      console.log(what)
+    },
+  };
+  // const folder = gui.addFolder("Worlds");
+  // // .open(false);
+  // folder.add(methods, "play");
+  // folder.domElement.innerHTML = `<div class="widget"><button><div class="name" onclick="game.addAsync(import("./mods/western/load.js"))">play</div></button></div>`
+}
+
+{
+  // speechSynthesis.speak(new SpeechSynthesisUtterance('cool'))
+}
+
+// Speech
+{
+  game.socket.on("chat message", (data) => {
+    const {message} = data
+    speechSynthesis.speak(new SpeechSynthesisUtterance(message))
+  });
+}
+
+// Create World placeholders
+{
+  const {THREE} = game
+  const sections = Array(5 * 5).fill(0)
+
+  const WIDTH = 100
+  
+  const scene = new Object3D()
+  scene.name = "worlds"
+  game.add(scene)
+  window.worlds = scene
+
+  sections.forEach((section, index) => {
+    const geometry = new THREE.BoxGeometry(WIDTH, 100, 100);
+    const material = new THREE.MeshBasicMaterial({ visible: true, wireframe: true });
+    const box = new THREE.Mesh(geometry, material);
+    // container.add(box);
+    box.position.x += index * WIDTH
+    scene.add(box)
+    return box
+  })
+}
+
+// Load world
+{
+  // game.addAsync(import("./mods/western/load.js"))
 }
